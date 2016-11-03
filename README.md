@@ -1,4 +1,4 @@
 # Lambda Calculus
 Carmen Mejia
-Wyatt Cooper
-Andrea Kimball
+,Wyatt Cooper
+,Andrea Kimball
