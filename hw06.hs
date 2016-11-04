@@ -1,7 +1,10 @@
 module Hw06 where
 
-import Control.Applicative
+import Control.Applicative ((<*), (*>), (<*>), (<$>))
 import Data.Char
+import Text.Parsec
+import FunctionsAndTypesForParsing
+import Control.Monad (void)
 
 
 type VarName = String
@@ -28,76 +31,76 @@ test2 = Var "y"
 test3 = Lam "x" test2
 test4 = Lam "y" (App test1 test2)
 
+type Parser = Parsec String ()
 
+--
+-- newtype Parser a = Parser { parse :: String -> Maybe (a,String) }
+--
+-- instance Functor Parser where
+--   fmap f p = Parser $ \s -> (\(a,c) -> (f a, c)) <$> parse p s
+--
+-- instance Applicative Parser where
+--   pure a = Parser $ \s -> Just (a,s)
+--   f <*> a = Parser $ \s ->
+--     case parse f s of
+--       Just (g,s') -> parse (fmap g a) s'
+--       Nothing -> Nothing
 
-newtype Parser a = Parser { parse :: String -> Maybe (a,String) }
+-- instance Alternative Parser where
+--   empty = Parser $ \s -> Nothing
+--   l <|> r = Parser $ \s -> parse l s <|> parse r s
 
-instance Functor Parser where
-  fmap f p = Parser $ \s -> (\(a,c) -> (f a, c)) <$> parse p s
+--
+-- ensure :: (a -> Bool) -> Parsec a -> Parsec a
+-- ensure p parser = Parser $ \s ->
+--    case parse parser s of
+--      Nothing -> Nothing
+--      Just (a,s') -> if p a then Just (a,s') else Nothing
+--
+-- lookahead :: Parsec (Maybe Char)
+-- lookahead = Parser f
+--   where f [] = Just (Nothing,[])
+--         f (c:s) = Just (Just c,c:s)
+--
+--
+--
+--
+--
+--
+--
+-- eof :: Parsec ()
+-- eof = Parser $ \s -> if null s then Just ((),[]) else Nothing
+--
+--
+-- ws :: Parsec ()
+-- ws = pure () <* many (satisfy isSpace)
 
-instance Applicative Parser where
-  pure a = Parser $ \s -> Just (a,s)
-  f <*> a = Parser $ \s ->
-    case parse f s of
-      Just (g,s') -> parse (fmap g a) s'
-      Nothing -> Nothing
-
-instance Alternative Parser where
-  empty = Parser $ \s -> Nothing
-  l <|> r = Parser $ \s -> parse l s <|> parse r s
-
-
-ensure :: (a -> Bool) -> Parser a -> Parser a
-ensure p parser = Parser $ \s ->
-   case parse parser s of
-     Nothing -> Nothing
-     Just (a,s') -> if p a then Just (a,s') else Nothing
-
-lookahead :: Parser (Maybe Char)
-lookahead = Parser f
-  where f [] = Just (Nothing,[])
-        f (c:s) = Just (Just c,c:s)
-
-satisfy :: (Char -> Bool) -> Parser Char
-satisfy p = Parser f
-  where f [] = Nothing
-        f (x:xs) = if p x then Just (x,xs) else Nothing
-
-
-
-eof :: Parser ()
-eof = Parser $ \s -> if null s then Just ((),[]) else Nothing
-
-
-ws :: Parser ()
-ws = pure () <* many (satisfy isSpace)
-
-char :: Char -> Parser Char
-char c = ws *> satisfy (==c)
-
-str :: String -> Parser String
-str s = ws *> loop s
-  where loop [] = pure []
-        loop (c:cs) = (:) <$> satisfy (==c) <*> loop cs
-
-parens :: Parser a -> Parser a
-parens p = (char '(' *> p) <* char ')'
-
-keywords :: [String]
-keywords = ["lambda","let"]
-isKeyword = (`elem` keywords)
-
-
-kw :: String -> Parser String
-kw s = str s <* ensure funct lookahead
-      where funct Nothing = False
-            funct (Just x)  = x == ' '
-
-
-var :: Parser String
-var = ensure (not . (`elem` keywords)) (ws *> id)
-  where id = (:) <$> satisfy isAlpha <*> many (satisfy isAlphaNum)
-
+-- char :: Char -> Parser Char
+-- char c = ws *> satisfy (==c)
+--
+-- str :: String -> Parsec String
+-- str s = ws *> loop s
+--   where loop [] = pure []
+--         loop (c:cs) = (:) <$> satisfy (==c) <*> loop cs
+--
+-- parens :: Parsec a -> Parsec a
+-- parens p = (char '(' *> p) <* char ')'
+--
+-- keywords :: [String]
+-- keywords = ["lambda","let"]
+-- isKeyword = (`elem` keywords)
+--
+--
+-- kw :: String -> Parsec String
+-- kw s = str s <* ensure funct lookahead
+--       where funct Nothing = False
+--             funct (Just x)  = x == ' '
+--
+--
+-- var :: Parsec String
+-- var = ensure (not . (`elem` keywords)) (ws *> id)
+--   where id = (:) <$> satisfy isAlpha <*> many (satisfy isAlphaNum)
+--
 
 
   --
@@ -146,38 +149,72 @@ var = ensure (not . (`elem` keywords)) (ws *> id)
   -- negs = Neg <$> (minus *> atoms) <|> atoms
   -- atoms = Num <$> num <|> Var <$> var <|> (char '(' *> terms <* char ')')
 
-
-spaces :: Parser ()
-spaces = many (satisfy isSpace) *> pure ()
-
-
+--
+-- spaces :: Parsec ()
+-- spaces = many (satisfy isSpace) *> pure ()
+--
+--
 dot :: Parser Char
 dot = char '.'
 
-lexp :: Parser LamExp
-lexp = lamP <|> appP  <|> varP
+-- lexp :: Parsec LamExp
+-- lexp = undefined
+
+-- lexp = lamP <|> (chainl appP)  <|> varP
+
+--
+-- var :: Parsec String
+-- var = do
+--    fc <- firstChar
+--    rest <- many nonFirstChar
+--    return (fc:rest)
+--  where
+--    firstChar = satisfy (\a -> isLetter a || a == '_')
+--    nonFirstChar = satisfy (\a -> isDigit a || isLetter a || a == '_')
+
+varExamples :: [(String,String)]
+varExamples = [("test", "test")
+               ,("_stuff", "_stuff")
+               ,("_1234", "_1234")]
+
+
+var :: Parser String
+var = do
+   fc <- firstChar
+   rest <- many nonFirstChar
+   return (fc:rest)
+ where
+   firstChar = satisfy (\a -> isLetter a || a == '_')
+   nonFirstChar = satisfy (\a -> isDigit a || isLetter a || a == '_')
+
+ws :: Parser ()
+ws = void $ many $ oneOf " \n\t"
 
 varP :: Parser LamExp
-varP =  Var <$> var
+varP =  Var <$> (ws *> var)
 
-appP :: Parser LamExp
-appP = App <$> (parens appP <|> lamP <|> varP) <*> (appP <|> lamP <|> varP)
+-- appP :: Parsec LamExp
+-- appP = undefined
 
-varPEnd :: Parser LamExp
-varPEnd = varP <* ensure null lookahead
+-- appP = App <$> (parens appP <|> lamP <|> varP) <*> (appP <|> lamP <|> varP)
 
-appP2 :: Parser LamExp
-appP2 = App <$> (varP <|> lamP <|> appP) <*> (parens appP <|> lamP <|> varPEnd <|> varP)
 
-lamP :: Parser LamExp
-lamP = Lam <$> (((kw "lambda") *> var) <* dot) <*> (appP <|> lamP <|> varP)
+-- varPEnd = varP <* ensure null lookahead
 
-first, second :: Parser LamExp
-first = App <$> (second) <*> (second)
-    <|> Var <$> var
-second = Lam <$> (((kw "lambda") *> var) <* dot) <*> (first)
-     <|> first
-     <|> Var <$> var
+-- appP2 :: Parsec LamExp
+-- appP2 = App <$> (varP <|> lamP <|> appP) <*> (parens appP <|> lamP <|> varPEnd <|> varP)
+
+-- lamP :: Parsec LamExp
+-- lamP = undefined
+
+-- lamP = Lam <$> (((kw "lambda") *> var) <* dot) <*> (appP <|> lamP <|> varP)
+--
+-- first, second :: Parsec LamExp
+-- firs = App <$> (second) <*> (second)
+--     <|> Var <$> var
+-- second = Lam <$> (((kw "lambda") *> var) <* dot) <*> (first)
+--      <|> first
+--      <|> Var <$> var
 
 -- factor :: Parser LamExp
 -- factor = Var <$> var <|>
