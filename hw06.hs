@@ -1,3 +1,5 @@
+--Various functions taken/adapted from https://github.com/JakeWheat/intro_to_parsing
+
 module Hw06 where
 
 import Control.Applicative ((<*), (*>), (<*>), (<$>))
@@ -78,28 +80,10 @@ type Parser = Parsec String ()
 -- char :: Char -> Parser Char
 -- char c = ws *> satisfy (==c)
 --
--- str :: String -> Parsec String
--- str s = ws *> loop s
---   where loop [] = pure []
---         loop (c:cs) = (:) <$> satisfy (==c) <*> loop cs
---
+
 -- parens :: Parsec a -> Parsec a
 -- parens p = (char '(' *> p) <* char ')'
 --
--- keywords :: [String]
--- keywords = ["lambda","let"]
--- isKeyword = (`elem` keywords)
---
---
--- kw :: String -> Parsec String
--- kw s = str s <* ensure funct lookahead
---       where funct Nothing = False
---             funct (Just x)  = x == ' '
---
---
--- var :: Parsec String
--- var = ensure (not . (`elem` keywords)) (ws *> id)
---   where id = (:) <$> satisfy isAlpha <*> many (satisfy isAlphaNum)
 --
 
 
@@ -177,7 +161,34 @@ varExamples = [("test", "test")
                ,("_stuff", "_stuff")
                ,("_1234", "_1234")]
 
+-- ensure :: (a -> Bool) -> Parsec a -> Parsec a
+-- ensure p parser = Parser $ \s ->
+--    case parse parser s of
+--      Nothing -> Nothing
+--      Just (a,s') -> if p a then Just (a,s') else Nothing
 
+-- str :: String -> Parser String
+-- str s = ws *> loop s
+--   where loop [] = pure []
+--         loop (c:cs) = (:) <$> satisfy (==c) <*> loop cs
+
+
+keywords :: [String]
+keywords = ["lambda","let"]
+
+isKeyword = (`elem` keywords)
+
+-- kw :: String -> Parser String
+-- kw s =  s <* ensure funct lookAhead
+--       where funct Nothing = False
+--             funct (Just x)  = x == ' '
+
+-- var :: Parser String
+-- var = ensure (not . (`elem` keywords)) (ws *> id)
+--   where id = (:) <$> satisfy isAlpha <*> many (satisfy isAlphaNum)
+
+
+--TODO: this definition of var does not check to make sure the var is not a keyword
 var :: Parser String
 var = do
    fc <- firstChar
@@ -193,7 +204,12 @@ ws = void $ many $ oneOf " \n\t"
 varP :: Parser LamExp
 varP =  Var <$> (ws *> var)
 
--- appP :: Parsec LamExp
+
+
+-- lamP :: Parser LamExp
+-- lamP = Lam <$> (((ws *> var) *> ws *> var) <* dot) <*> (appP <|> lamP <|> varP)
+
+-- appP :: Parser LamExp
 -- appP = undefined
 
 -- appP = App <$> (parens appP <|> lamP <|> varP) <*> (appP <|> lamP <|> varP)
