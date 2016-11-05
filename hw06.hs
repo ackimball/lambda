@@ -143,5 +143,9 @@ main = do
     a <- getArgs
     case a of
       [str] -> parseFromFile program str >>= either print print
-      _ -> error "please pass one argument with the string to parse"
+      _ -> do 
+             input <- getContents 
+             case (regularParse program input) of
+                  Right e1 -> putStr (show e1)
+                  Left e2  -> error (show e2)
 
