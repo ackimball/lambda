@@ -2,20 +2,32 @@
 
 module Hw06 where
 
+import System.Environment
 import Control.Applicative ((<*), (*>), (<*>), (<$>))
 import Data.Char
 import Text.Parsec
+import Text.Parsec.String (parseFromFile)
 import FunctionsAndTypesForParsing
 import Control.Monad (void)
 
 
 type VarName = String
 
+--type Store = Map VarName LamExp
+
 data LamExp =
     Var VarName
   | App LamExp LamExp
   | Lam VarName LamExp
   deriving Eq
+
+data Stmt =
+      Let VarName LamExp
+    | Exp LamExp
+    | Seq Stmt Stmt 
+   deriving (Show, Eq)
+
+
 
 instance Show LamExp where
   show = show' 0 where
@@ -39,149 +51,21 @@ type Parser = Parsec String ()
 --program ::= statement (;statement)+ ;?
 --statement ::= let x = e | e
 
---
--- newtype Parser a = Parser { parse :: String -> Maybe (a,String) }
---
--- instance Functor Parser where
---   fmap f p = Parser $ \s -> (\(a,c) -> (f a, c)) <$> parse p s
---
--- instance Applicative Parser where
---   pure a = Parser $ \s -> Just (a,s)
---   f <*> a = Parser $ \s ->
---     case parse f s of
---       Just (g,s') -> parse (fmap g a) s'
---       Nothing -> Nothing
-
--- instance Alternative Parser where
---   empty = Parser $ \s -> Nothing
---   l <|> r = Parser $ \s -> parse l s <|> parse r s
-
---
---ensure :: (a -> Bool) -> Parser a -> Parser a
---ensure p parser = Parser $ \s ->
---   case parse parser s of
---     Left e1 -> Left e1
---     Right (a,s') -> if p a then Right (a,s') else Left
---
--- lookahead :: Parsec (Maybe Char)
--- lookahead = Parser f
---   where f [] = Just (Nothing,[])
---         f (c:s) = Just (Just c,c:s)
---
---
---
---
---
---
---
--- eof :: Parsec ()
--- eof = Parser $ \s -> if null s then Just ((),[]) else Nothing
---
---
--- ws :: Parsec ()
--- ws = pure () <* many (satisfy isSpace)
-
--- char :: Char -> Parser Char
--- char c = ws *> satisfy (==c)
---
-
 parens :: Parser a -> Parser a
 parens p = (char '(' *> p) <* char ')'
---
---
 
-
-  --
-  -- plus, minus, times :: Parser Char
-  -- plus = char '+'
-  -- minus = char '-'
-  -- times = char '*'
-  -- divs = char '/'
-  -- --
-  -- spaces :: Parser ()
-  -- spaces = many (satisfy isSpace) *> pure ()
-  -- --
-  -- terms, factors, negs, atoms, aexp :: Parser AExp
-  -- aexp = terms
-  -- terms = Plus <$> factors <* plus <*> terms
-  --         <|> (\a b -> Plus a (Neg b)) <$> factors <* minus <*> terms
-  --         <|> factors
-  -- factors = Times <$> negs <* times <*> factors
-  --           <|> Div <$> negs <* divs <*> factors <|> negs
-  -- negs = Neg <$> (minus *> atoms) <|> atoms
-  -- atoms = Num <$> num <|> Var <$> var <|> (char '(' *> terms <* char ')')
-
-
-
-
-  -- statement, statements, cSyntax :: Parser Stmt
-  -- cSyntax = statements
-  -- statements = Seq <$> statement <*> (statement <|> statements )
-  -- statement = const Skip <$> kw "Skip"
-  --          <|> Assign <$> var <* char '=' <*> aexp <* char ';'
-  --          <|> If <$> (kw "if" *> bexp) <*> (char '{' *> statements  <* char '}')
-  --          <*> (kw "else" *> (char '{' *> statements  <* char '}'))
-  --          <|> While <$> (kw "while" *> bexp) <*> (char '{' *> statements <* char '}' <* char ';')
-  --          <|> pure Skip <* ws
-  --
-  --
-  --
-
-  -- terms, factors, negs, atoms, aexp :: Parser AExp
-  -- aexp = terms
-  -- terms = Plus <$> factors <* plus <*> terms
-  --         <|> (\a b -> Plus a (Neg b)) <$> factors <* minus <*> terms
-  --         <|> factors
-  -- factors = Times <$> negs <* times <*> factors
-  --           <|> Div <$> negs <* divs <*> factors <|> negs
-  -- negs = Neg <$> (minus *> atoms) <|> atoms
-  -- atoms = Num <$> num <|> Var <$> var <|> (char '(' *> terms <* char ')')
-
---
--- spaces :: Parsec ()
--- spaces = many (satisfy isSpace) *> pure ()
---
---
 dot :: Parser Char
 dot = char '.'
-
--- lexp :: Parsec LamExp
--- lexp = undefined
-
--- lexp = lamP <|> (chainl appP)  <|> varP
-
---
--- var :: Parsec String
--- var = do
---    fc <- firstChar
---    rest <- many nonFirstChar
---    return (fc:rest)
---  where
---    firstChar = satisfy (\a -> isLetter a || a == '_')
---    nonFirstChar = satisfy (\a -> isDigit a || isLetter a || a == '_')
 
 varExamples :: [(String,String)]
 varExamples = [("test", "test")
                ,("_stuff", "_stuff")
                ,("_1234", "_1234")]
 
--- ensure :: (a -> Bool) -> Parsec a -> Parsec a
--- ensure p parser = Parser $ \s ->
---    case parse parser s of
---      Nothing -> Nothing
---      Just (a,s') -> if p a then Just (a,s') else Nothing
-
--- str :: String -> Parser String
--- str s = ws *> loop s
---   where loop [] = pure []
---         loop (c:cs) = (:) <$> satisfy (==c) <*> loop cs
-
-
 keywords :: [String]
 keywords = ["lambda","let"]
 
 isKeyword = (`elem` keywords)
-
 
 lexeme :: Parser a -> Parser a
 lexeme p = do
@@ -189,17 +73,6 @@ lexeme p = do
            ws
            return x
 
--- kw :: String -> Parser String
--- kw s =  s <* ensure funct lookAhead
---       where funct Nothing = False
---             funct (Just x)  = x == ' '
-
--- var :: Parser String
--- var = ensure (not . (`elem` keywords)) (ws *> id)
---   where id = (:) <$> satisfy isAlpha <*> many (satisfy isAlphaNum)
-
-
---TODO: this definition of var does not check to make sure the var is not a keyword
 var :: Parser String
 var = (lexeme . try) (p >>= check)
   where
@@ -246,4 +119,29 @@ op =
 
 app :: LamExp -> LamExp -> LamExp
 app x y = App x y 
+
+sc :: Parser Char
+sc = char ';'
+
+nl :: Parser Char
+nl = ws *> satisfy (=='\n')
+
+program :: Parser Stmt
+program = seqParser
+
+seqParser :: Parser Stmt
+seqParser = ws *> (try (Seq <$> (stmtParser <* sc) <*> seqParser) <|> try stmtParser)
+  
+stmtParser :: Parser Stmt 
+stmtParser = try expCase <|> try letCase
+          where
+             expCase = Exp <$> lexp
+             letCase = Let <$> ((kw "let") *> var <* (char '=')) <*> lexp
+
+main :: IO ()
+main = do
+    a <- getArgs
+    case a of
+      [str] -> parseFromFile program str >>= either print print
+      _ -> error "please pass one argument with the string to parse"
 
