@@ -11,6 +11,8 @@ import FunctionsAndTypesForParsing
 import Control.Monad (void)
 import qualified Data.Map as Map
 import Data.Map (Map, findWithDefault, (!))
+import qualified Data.Set as Set
+import Data.Set (Set)
 
 type VarName = String
 
@@ -139,18 +141,32 @@ stmtParser = try expCase <|> try letCase
              expCase = Exp <$> lexp
              letCase = Let <$> ((kw "let") *> var <* (char '=')) <*> lexp
 
+--Substitution
 subst :: LamExp -> VarName -> LamExp -> LamExp
 subst (Var y) x e = if y == x then e else (Var y)
 subst (App e1 e2) x e3 = App (subst e1 x e2) (subst e2 x e3)
 subst (Lam y e1) x e2 = if y == x then Lam x e1 else Lam y (subst e1 x e2)
 
+-- Interpreter for LC
 evalLam :: Store -> LamExp -> LamExp
 evalLam st (Var x) = undefined
 evalLam st (Lam x la) = undefined
 evalLam st (App l1 l2) = undefined
 
+-- Interpreter for Statements
 evalStmt :: Store -> Stmt -> Stmt
 evalStmt st stmt = undefined
+
+--Checking for free variables
+--(will be used with the -c flag)
+fv :: LamExp -> Set VarName
+fv (Var x) = Set.singleton x
+fv (App e1 e2) = Set.union (fv e1) (fv e2)
+fv (Lam x e) = Set.difference (fv e) (Set.singleton x)  
+
+--e is closed IFF fv(e) = empty set
+isClosed :: LamExp -> Bool
+isClosed e = fv e == Set.empty
 
 main :: IO ()
 main = do
