@@ -53,11 +53,11 @@ type Parser = Parsec String ()
 --   l <|> r = Parser $ \s -> parse l s <|> parse r s
 
 --
--- ensure :: (a -> Bool) -> Parsec a -> Parsec a
--- ensure p parser = Parser $ \s ->
---    case parse parser s of
---      Nothing -> Nothing
---      Just (a,s') -> if p a then Just (a,s') else Nothing
+--ensure :: (a -> Bool) -> Parser a -> Parser a
+--ensure p parser = Parser $ \s ->
+--   case parse parser s of
+--     Left e1 -> Left e1
+--     Right (a,s') -> if p a then Right (a,s') else Left
 --
 -- lookahead :: Parsec (Maybe Char)
 -- lookahead = Parser f
@@ -178,6 +178,13 @@ keywords = ["lambda","let"]
 
 isKeyword = (`elem` keywords)
 
+
+lexeme :: Parser a -> Parser a
+lexeme p = do
+           x <- p
+           ws
+           return x
+
 -- kw :: String -> Parser String
 -- kw s =  s <* ensure funct lookAhead
 --       where funct Nothing = False
@@ -190,27 +197,47 @@ isKeyword = (`elem` keywords)
 
 --TODO: this definition of var does not check to make sure the var is not a keyword
 var :: Parser String
-var = do
-   fc <- firstChar
-   rest <- many nonFirstChar
-   return (fc:rest)
- where
-   firstChar = satisfy (\a -> isLetter a || a == '_')
-   nonFirstChar = satisfy (\a -> isDigit a || isLetter a || a == '_')
+var = (lexeme . try) (p >>= check)
+  where
+    p       = (:) <$> firstChar <*> many nonFirstChar
+    check x = if x `elem` keywords
+                then fail $ "keyword " ++ show x ++ " cannot be a var"
+                else return x
+
+kw :: String -> Parser String
+kw s = (lexeme . try) (p >>= check)
+  where
+    p       = (:) <$> firstChar <*> many nonFirstChar
+    check x = if (not (s == x))
+                then fail $ show x ++ ", I think you meant " ++ show s
+                else return x
 
 ws :: Parser ()
 ws = void $ many $ oneOf " \n\t"
 
+lexp ::Parser LamExp
+lexp = chainl1 (lamP <|> varP) op
+
 varP :: Parser LamExp
 varP =  Var <$> (ws *> var)
 
+firstChar = satisfy (\a -> isLetter a || a == '_')
+nonFirstChar = satisfy (\a -> isDigit a || isLetter a || a == '_')
 
 
--- lamP :: Parser LamExp
--- lamP = Lam <$> (((ws *> var) *> ws *> var) <* dot) <*> (appP <|> lamP <|> varP)
+lamP :: Parser LamExp
+lamP = Lam <$> (((kw "lambda") *> var) <* dot) <*> (lamP <|> varP)
 
--- appP :: Parser LamExp
--- appP = undefined
+op :: Parser (LamExp -> LamExp -> LamExp)
+op =
+  do spaces
+     symbol <- char '+'
+     spaces
+     case symbol of
+       '+' -> return app
+
+app :: LamExp -> LamExp -> LamExp
+app x y = App x y 
 
 -- appP = App <$> (parens appP <|> lamP <|> varP) <*> (appP <|> lamP <|> varP)
 
