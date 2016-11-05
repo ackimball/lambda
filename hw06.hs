@@ -140,10 +140,9 @@ stmtParser = try expCase <|> try letCase
              letCase = Let <$> ((kw "let") *> var <* (char '=')) <*> lexp
 
 subst :: LamExp -> VarName -> LamExp -> LamExp
+subst (Var y) x e = if y == x then e else (Var y)
 subst (App e1 e2) x e3 = App (subst e1 x e2) (subst e2 x e3)
 subst (Lam y e1) x e2 = if y == x then Lam x e1 else Lam y (subst e1 x e2)
-subst y x e = if y == Var x then e else y
-
 
 evalLam :: Store -> LamExp -> LamExp
 evalLam st (Var x) = undefined
