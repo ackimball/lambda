@@ -15,17 +15,17 @@ data LamExp =
     Var VarName
   | App LamExp LamExp
   | Lam VarName LamExp
-  deriving (Eq, Show)
+  deriving Eq
 
--- instance Show LamExp where
---   show = show' 0 where
---     show' _ (Var v) = v
---     show' z (App la1 la2)
---      | z < 1 = show' 1 la1 ++ " " ++ show' 1 la2
---      | otherwise = "(" ++ show' 1 la1 ++ " " ++ show' 1 la2 ++ ")"
---     show' z (Lam x la)
---      | z < 1 = "lambda " ++ show' 1 (Var x) ++ ". " ++ show' 1 la
---      | otherwise = "(" ++ "lambda " ++ show' 1 (Var x) ++ ". " ++ show' 1 la ++ ")"
+instance Show LamExp where
+  show = show' 0 where
+    show' _ (Var v) = v
+    show' z (App la1 la2)
+     | z < 1 = show' 1 la1 ++ " " ++ show' 1 la2
+     | otherwise = "(" ++ show' 1 la1 ++ " " ++ show' 1 la2 ++ ")"
+    show' z (Lam x la)
+     | z < 1 = "lambda " ++ show' 1 (Var x) ++ ". " ++ show' 1 la
+     | otherwise = "(" ++ "lambda " ++ show' 1 (Var x) ++ ". " ++ show' 1 la ++ ")"
 
 
 test1 = Var "x"
@@ -34,6 +34,10 @@ test3 = Lam "x" test2
 test4 = Lam "y" (App test1 test2)
 
 type Parser = Parsec String ()
+
+
+--program ::= statement (;statement)+ ;?
+--statement ::= let x = e | e
 
 --
 -- newtype Parser a = Parser { parse :: String -> Maybe (a,String) }
@@ -81,8 +85,8 @@ type Parser = Parsec String ()
 -- char c = ws *> satisfy (==c)
 --
 
--- parens :: Parsec a -> Parsec a
--- parens p = (char '(' *> p) <* char ')'
+parens :: Parser a -> Parser a
+parens p = (char '(' *> p) <* char ')'
 --
 --
 
@@ -216,7 +220,7 @@ ws :: Parser ()
 ws = void $ many $ oneOf " \n\t"
 
 lexp ::Parser LamExp
-lexp = chainl1 (lamP <|> varP) op
+lexp = ws *> (chainl1 (lamP <|> varP <|> parens lexp) op)
 
 varP :: Parser LamExp
 varP =  Var <$> (ws *> var)
@@ -224,50 +228,22 @@ varP =  Var <$> (ws *> var)
 firstChar = satisfy (\a -> isLetter a || a == '_')
 nonFirstChar = satisfy (\a -> isDigit a || isLetter a || a == '_')
 
-
 lamP :: Parser LamExp
-lamP = Lam <$> (((kw "lambda") *> var) <* dot) <*> (lamP <|> varP)
+lamP = try oneArg <|> try multArgs
+        where 
+          oneArg = Lam <$> (((kw "lambda") *> var <* dot)) <*> lexp
+          multArgs = Lam <$> ((kw "lambda") *> var) <*> lamP2
+
+lamP2 :: Parser LamExp
+lamP2 = try moreArgs <|> try lastArg
+        where
+          lastArg = Lam <$> (var <* dot) <*> lexp
+          moreArgs = Lam <$> var <*> lamP2
 
 op :: Parser (LamExp -> LamExp -> LamExp)
 op =
-  do spaces
-     symbol <- char '+'
-     spaces
-     case symbol of
-       '+' -> return app
+  do return app
 
 app :: LamExp -> LamExp -> LamExp
 app x y = App x y 
 
--- appP = App <$> (parens appP <|> lamP <|> varP) <*> (appP <|> lamP <|> varP)
-
-
--- varPEnd = varP <* ensure null lookahead
-
--- appP2 :: Parsec LamExp
--- appP2 = App <$> (varP <|> lamP <|> appP) <*> (parens appP <|> lamP <|> varPEnd <|> varP)
-
--- lamP :: Parsec LamExp
--- lamP = undefined
-
--- lamP = Lam <$> (((kw "lambda") *> var) <* dot) <*> (appP <|> lamP <|> varP)
---
--- first, second :: Parsec LamExp
--- firs = App <$> (second) <*> (second)
---     <|> Var <$> var
--- second = Lam <$> (((kw "lambda") *> var) <* dot) <*> (first)
---      <|> first
---      <|> Var <$> var
-
--- factor :: Parser LamExp
--- factor = Var <$> var <|>
---          App <$> lexp <*> lexp <|>
---          Lam <$> (kw "lambda" *> var <* dot) <*> lexp <|>
---          (char '(') *> lexp <* (char ')')
-
-
--- appP :: Parser LamExp
--- appP = App <$> lamP <*> lamP <|>
---
--- lamP :: Parser LamExp
--- lamP = Lam <$> (kw "lambda" *> var) <*> lexp
