@@ -9,11 +9,12 @@ import Text.Parsec
 import Text.Parsec.String (parseFromFile)
 import FunctionsAndTypesForParsing
 import Control.Monad (void)
-
+import qualified Data.Map as Map
+import Data.Map (Map, findWithDefault, (!))
 
 type VarName = String
 
---type Store = Map VarName LamExp
+type Store = Map VarName LamExp
 
 data LamExp =
     Var VarName
@@ -137,6 +138,20 @@ stmtParser = try expCase <|> try letCase
           where
              expCase = Exp <$> lexp
              letCase = Let <$> ((kw "let") *> var <* (char '=')) <*> lexp
+
+subst :: LamExp -> VarName -> LamExp -> LamExp
+subst (App e1 e2) x e3 = App (subst e1 x e2) (subst e2 x e3)
+subst (Lam y e1) x e2 = if y == x then Lam x e1 else Lam y (subst e1 x e2)
+subst y x e = if y == Var x then e else y
+
+
+evalLam :: Store -> LamExp -> LamExp
+evalLam st (Var x) = undefined
+evalLam st (Lam x la) = undefined
+evalLam st (App l1 l2) = undefined
+
+evalStmt :: Store -> Stmt -> Stmt
+evalStmt st stmt = undefined
 
 main :: IO ()
 main = do
