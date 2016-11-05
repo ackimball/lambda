@@ -154,8 +154,10 @@ evalLam st (Lam x la) = undefined
 evalLam st (App l1 l2) = undefined
 
 -- Interpreter for Statements
-evalStmt :: Store -> Stmt -> Stmt
-evalStmt st stmt = undefined
+evalStmt :: Store -> Stmt -> Store
+evalStmt st (Let x l) = Map.insert x (evalLam st l) st
+evalStmt st (Exp l) = undefined
+evalStmt st (Seq s1 s2) = (evalStmt (evalStmt st s1) s2)
 
 --Checking for free variables
 --(will be used with the -c flag)
