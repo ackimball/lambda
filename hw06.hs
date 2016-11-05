@@ -93,7 +93,7 @@ ws :: Parser ()
 ws = void $ many $ oneOf " \n\t"
 
 lexp ::Parser LamExp
-lexp = ws *> (chainl1 (lamP <|> varP <|> parens lexp) op)
+lexp = ws *> (chainl1 (try lamP <|> try varP <|> (parens lexp)) op)
 
 varP :: Parser LamExp
 varP =  Var <$> (ws *> var)
@@ -102,7 +102,7 @@ firstChar = satisfy (\a -> isLetter a || a == '_')
 nonFirstChar = satisfy (\a -> isDigit a || isLetter a || a == '_')
 
 lamP :: Parser LamExp
-lamP = try oneArg <|> try multArgs
+lamP = try oneArg <|> multArgs
         where 
           oneArg = Lam <$> (((kw "lambda") *> var <* dot)) <*> lexp
           multArgs = Lam <$> ((kw "lambda") *> var) <*> lamP2
