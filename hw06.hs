@@ -22,7 +22,7 @@ data LamExp =
     Var VarName
   | App LamExp LamExp
   | Lam VarName LamExp
-  deriving Eq
+  deriving (Show,Eq)
 
 data Stmt =
       Let VarName LamExp
@@ -32,15 +32,15 @@ data Stmt =
 
 
 
-instance Show LamExp where
-  show = show' 0 where
-    show' _ (Var v) = v
-    show' z (App la1 la2)
-     | z < 1 = show' 1 la1 ++ " " ++ show' 1 la2
-     | otherwise = "(" ++ show' 1 la1 ++ " " ++ show' 1 la2 ++ ")"
-    show' z (Lam x la)
-     | z < 1 = "lambda " ++ show' 1 (Var x) ++ ". " ++ show' 1 la
-     | otherwise = "(" ++ "lambda " ++ show' 1 (Var x) ++ ". " ++ show' 1 la ++ ")"
+-- instance Show LamExp where
+--   show = show' 0 where
+--     show' _ (Var v) = v
+--     show' z (App la1 la2)
+--      | z < 1 = show' 1 la1 ++ " " ++ show' 1 la2
+--      | otherwise = "(" ++ show' 1 la1 ++ " " ++ show' 1 la2 ++ ")"
+--     show' z (Lam x la)
+--      | z < 1 = "lambda " ++ show' 1 (Var x) ++ ". " ++ show' 1 la
+--      | otherwise = "(" ++ "lambda " ++ show' 1 (Var x) ++ ". " ++ show' 1 la ++ ")"
 
 
 test1 = Var "x"
@@ -147,17 +147,34 @@ subst (Var y) x e = if y == x then e else (Var y)
 subst (App e1 e2) x e3 = App (subst e1 x e2) (subst e2 x e3)
 subst (Lam y e1) x e2 = if y == x then Lam x e1 else Lam y (subst e1 x e2)
 
+-- EXAMPLE of how interpreter should work
+-- If we parse test2, we get: 
+-- Seq (Let "zero" (Lam "s" (Lam "z" (Var "z")))) (Let "succ" (Lam "n" (Lam "s" (Lam "z" (App (Var "s") (App (App (Var "n") (Var "s")) (Var "z")))))))
+-- This is how we want that to be "interpreted":
+-- (Lam "s" (Lam "z" (App (Var "s") (App (App (Lam "s" (Lam "z" (App (Var "s") (App (App (Lam "s" (Lam "z" (Var "z"))) (Var "s")) (Var "z"))))) (Var "s")) (Var "z")))))
+-- Here are the steps:
+-- 1. evalStmt to get ride of the Seq, Let, etc. (done except for Exp, see comment)
+-- 2. evalLam to make substitutions that go 
+--   from:
+--   lambda s (lambda z. z) (lambda n . (lambda s. (lambda z (s ((n s) z)))))
+--   to:
+--   lambda s z. s ((lambda s z. s ((lambda s z. z) s z)) s z)
+
+
 -- Interpreter for LC
+-- So this needs to use substitution somehow
 evalLam :: Store -> LamExp -> LamExp
-evalLam st (Var x) = undefined
+evalLam st (Var x) = findWithDefault (Var "x") x st
 evalLam st (Lam x la) = undefined
 evalLam st (App l1 l2) = undefined
 
 -- Interpreter for Statements
 evalStmt :: Store -> Stmt -> Store
 evalStmt st (Let x l) = Map.insert x (evalLam st l) st
-evalStmt st (Exp l) = undefined
+evalStmt st (Exp l) = undefined --I had "evalLam st l" but leads to type error. any other ideas?
 evalStmt st (Seq s1 s2) = (evalStmt (evalStmt st s1) s2)
+
+
 
 --Checking for free variables
 --(will be used with the -c flag)
