@@ -166,7 +166,10 @@ subst (Lam y e1) x e2 = if y == x then e1 else (subst e1 x e2)
 evalLam :: Store -> LamExp -> LamExp
 evalLam st (Var x) = findWithDefault (Var "x") x st
 evalLam st (Lam x la) = Lam x (evalLam st la)
-evalLam st (App l1 l2) = (evalLam st l1)                
+evalLam st (App l1 l2) = case l1 of
+                              (Lam var expr) -> subst l2 var l1
+                              e@_ -> evalLam st ((evalLam st e) `app` l2)
+
 
 
 -- Interpreter for Statements
