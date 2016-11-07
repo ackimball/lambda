@@ -27,7 +27,7 @@ data LamExp =
   | Lam VarName LamExp
   | Zero 
   | Succ LamExp 
-  deriving (Show,Eq)
+  deriving Eq
 
 
 data Stmt =
@@ -38,15 +38,15 @@ data Stmt =
 
 
 
---instance Show LamExp where
---  show = show' 0 where
---    show' _ (Var v) = v
---    show' z (App la1 la2)
---     | z < 1 = show' 1 la1 ++ " " ++ show' 1 la2
---     | otherwise = "(" ++ show' 1 la1 ++ " " ++ show' 1 la2 ++ ")"
---    show' z (Lam x la)
---     | z < 1 = "lambda " ++ show' 1 (Var x) ++ ". " ++ show' 1 la
---     | otherwise = "(" ++ "lambda " ++ show' 1 (Var x) ++ ". " ++ show' 1 la ++ ")"
+instance Show LamExp where
+  show = show' 0 where
+    show' _ (Var v) = v
+    show' z (App la1 la2)
+     | z < 1 = show' 1 la1 ++ " " ++ show' 1 la2
+     | otherwise = "(" ++ show' 1 la1 ++ " " ++ show' 1 la2 ++ ")"
+    show' z (Lam x la)
+     | z < 1 = "lambda " ++ show' 1 (Var x) ++ ". " ++ show' 1 la
+     | otherwise = "(" ++ "lambda " ++ show' 1 (Var x) ++ ". " ++ show' 1 la ++ ")"
 
 
 test1 = Var "x"
