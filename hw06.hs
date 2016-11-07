@@ -144,7 +144,7 @@ stmtParser = try expCase <|> try letCase
 --Substitution
 subst :: LamExp -> VarName -> LamExp -> LamExp
 subst v@(Var y) x e = if (y == x) then e else v
-subst (App e1 e2) x e3 = app (subst e1 x e2) (subst e2 x e3)
+subst (App e1 e2) x e3 = app (subst e1 x e3) (subst e2 x e3)
 subst (Lam y e1) x e2 = if y == x then (subst e1 x e2) else (Lam y (subst e1 x e2))
 
 -- EXAMPLE of how interpreter should work
@@ -166,9 +166,10 @@ subst (Lam y e1) x e2 = if y == x then (subst e1 x e2) else (Lam y (subst e1 x e
 evalLam :: Store -> LamExp -> LamExp
 evalLam st (Var x) = findWithDefault (Var x) x st
 evalLam st (Lam x la) = Lam x (evalLam st la)
-evalLam st (App l1 l2) = case (evalLam st l1) of
-                              (Lam var expr) -> subst (evalLam st l1) var l2
-                              e@_ -> evalLam st (app (evalLam st e) l2)
+evalLam st (App l1@(Lam v1 e1) l2) = case l2 of
+                              (Lam var expr) -> subst l1 v1 l2
+                              e@_ -> evalLam st (app l1 (evalLam st l2))
+evalLam st (App e@_ l2) = evalLam st (app (evalLam st e) l2  )        
 
 -- Interpreter for Statements
 evalStmt :: Store -> Stmt -> Store
@@ -183,12 +184,12 @@ evalStmt2 l (Seq s1 s2) = (evalStmt2 (evalStmt2 l s1) s2)
 
 evalAll :: [LamExp] -> Store -> String
 evalAll [] _ = "Running program"
-evalAll (l:ls) st = (evalAll ls st) ++ "\n" ++ (show (evalLam st l)) ++"\n" 
+evalAll (l:ls) st = (evalAll ls st) ++ "\n" ++ (show (evalLam st l)) 
  
 evalAllWT :: [LamExp] -> Store -> String
 evalAllWT [] _ = "Running program"
-evalAllWT (l:ls) st = if (isClosed l) then (evalAll ls st) ++ "\n" ++ (show (evalLam st l))
-                    else error (show (fv l)) ++ " are free variables in " ++ (show l)
+evalAllWT (l:ls) st = if (isClosed (evalLam st l)) then (evalAllWT ls st) ++ "\n" ++ (show (evalLam st l))
+                    else error (show (fv (evalLam st l))) ++ " are free variables in " ++ (show l)
 
 --Checking for free variables
 --(will be used with the -c flag)
@@ -210,7 +211,7 @@ main = do
             case prog of
                   Right e1 -> let stores = (evalStmt s e1) 
                                   lams = (evalStmt2 g e1) in 
-                                  putStr (evalAll lams stores)
+                                  putStr (evalAllWT lams stores)
                   Left e2  -> error (show e2)
                   where s = Map.empty
                         g = []

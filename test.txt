@@ -1,6 +1,4 @@
-let true = lambda a b . a;
-let false = lambda a b . b;
-let not = lambda b . lambda x y. b y x;
-not;
-true;
-not true
+let zero = lambda s z. z;
+let succ = lambda n. lambda s z. s (n s z);
+succ (succ zero);
+succ (succ (succ zero))
