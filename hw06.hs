@@ -55,10 +55,12 @@ test3 = Lam "x" test2
 test4 = Lam "y" (App test1 test2)
 
 one = Lam "s" (Lam "z" (App (Var "s") (App (App (Lam "s" (Lam "z" (Var "z"))) (Var "s")) (Var "z"))))
+
 asdf = (App (Var "s") (App (App (Lam "s" (Lam "z" (Var "z"))) (Var "s")) (Var "z")))
 
 successor = (Lam "n" (Lam "s" (Lam "z" (App (Var "s") (App (App (Var "n") (Var "s")) (Var "z"))))))
 zero = (Lam "s" (Lam "z" (Var "z")))
+
 type Parser = Parsec String ()
 
 
@@ -200,6 +202,10 @@ evalAllChurch :: [LamExp] -> Store -> String
 evalAllChurch [] _ = "Running program"
 evalAllChurch (l:ls) st = (evalAllChurch ls st) ++ "\n" ++ (show (convert (convert2 st (l))))
 
+evalAllChurchWT :: [LamExp] -> Store -> String
+evalAllChurchWT [] _ = "Running program"
+evalAllChurchWT (l:ls) st = if (isClosed (evalLam st l)) then (evalAllChurch ls st) ++ "\n" ++ (show (convert (convert2 st (l))))
+                          else error ((show (fv (evalLam st l))) ++ " are free variables in " ++ (show l))
 
 evalAllWT :: [LamExp] -> Store -> String
 evalAllWT [] _ = "Running program"
@@ -214,9 +220,9 @@ fv (App e1 e2) = Set.union (fv e1) (fv e2)
 fv (Lam x e) = Set.difference (fv e) (Set.singleton x)
 
 convert :: LamExp -> Int
-convert (Var x) = error "mad"
-convert (Lam x e1) = error "mad"
-convert (App e1 e2) = error "mad"
+convert e@(Var x) = error ("Couldn't extract a number from " ++ (show e))
+convert e@(Lam x e1) = error ("Couldn't extract a number from " ++ (show e))
+convert e@(App e1 e2) = error ("Couldn't extract a number from " ++ (show e))
 convert Zero = 0
 convert (Succ lam) = 1 + (convert lam)
 
@@ -224,8 +230,8 @@ convert2 :: Store -> LamExp -> LamExp
 convert2 st (Var x) = convert2 st (st ! x)
 convert2 st (Lam "s" (Lam "z" (Var "z"))) = Zero
 convert2 st (App (Var x) e@_) = convert2 st (App (st ! x) e)
-convert2 st (App e1 e2) = if (e1 == successor) then Succ (convert2 st e2) else error "mad"
-convert2 st _ = error "mad"
+convert2 st e@(App e1 e2) = if (e1 == successor) then Succ (convert2 st e2) else error ("Couldn't extract a number from " ++ (show e))
+convert2 st e@_ = error ("Couldn't extract a number from " ++ (show e))
 
 --e is closed IFF fv(e) = empty set
 isClosed :: LamExp -> Bool
@@ -260,7 +266,7 @@ par ["-cn", fs] = do
   case prog of
         Right e1 -> let stores = (evalStmt s e1)
                         lams = (evalStmt2 g e1) in
-                        putStr (evalAllWT lams stores)
+                        putStr (evalAllChurchWT lams stores)
 
         Left e2  -> error (show e2)
         where s = Map.empty
@@ -270,47 +276,47 @@ par ["-nc", fs] = do
   case prog of
         Right e1 -> let stores = (evalStmt s e1)
                         lams = (evalStmt2 g e1) in
-                        putStr (evalAllWT lams stores)
+                        putStr (evalAllChurchWT lams stores)
 
         Left e2  -> error (show e2)
         where s = Map.empty
               g = []
-par ["-c"] = do
-  input <- getContents
-  case (regularParse program input) of
-                   Right e1 -> let s = (evalStmt s e1)
-                                   g = (evalStmt2 g e1) in
-                                   putStr (evalAllWT g s)
-                   Left e2  -> error (show e2)
-                   where s = Map.empty
-                         g = []
-par ["-n"] = do
-  input <- getContents
-  case (regularParse program input) of
-                   Right e1 -> let s = (evalStmt s e1)
-                                   g = (evalStmt2 g e1) in
-                                   putStr (show e1)
-                   Left e2  -> error (show e2)
-                   where s = Map.empty
-                         g = []
-par ["-cn"] = do
-  input <- getContents
-  case (regularParse program input) of
-                   Right e1 -> let s = (evalStmt s e1)
-                                   g = (evalStmt2 g e1) in
-                                   putStr (evalAllWT g s)
-                   Left e2  -> error (show e2)
-                   where s = Map.empty
-                         g = []
-par ["-nc"] = do
-  input <- getContents
-  case (regularParse program input) of
-                   Right e1 -> let s = (evalStmt s e1)
-                                   g = (evalStmt2 g e1) in
-                                   putStr (evalAllWT g s)
-                   Left e2  -> error (show e2)
-                   where s = Map.empty
-                         g = []
+--par ["-c"] = do
+--  input <- getContents
+--  case (regularParse program input) of
+--                   Right e1 -> let s = (evalStmt s e1)
+--                                   g = (evalStmt2 g e1) in
+--                                   putStr (evalAllWT g s)
+--                   Left e2  -> error (show e2)
+--                   where s = Map.empty
+--                         g = []
+--par ["-n"] = do
+--  input <- getContents
+--  case (regularParse program input) of
+--                   Right e1 -> let s = (evalStmt s e1)
+--                                   g = (evalStmt2 g e1) in
+--                                   putStr (evalAllChurch 
+--                   Left e2  -> error (show e2)
+--                   where s = Map.empty
+--                         g = []
+--par ["-cn"] = do
+--  input <- getContents
+--  case (regularParse program input) of
+--                   Right e1 -> let s = (evalStmt s e1)
+--                                   g = (evalStmt2 g e1) in
+--                                   putStr (evalAllWT g s)
+--                   Left e2  -> error (show e2)
+--                   where s = Map.empty
+--                         g = []
+--par ["-nc"] = do
+--  input <- getContents
+--  case (regularParse program input) of
+--                   Right e1 -> let s = (evalStmt s e1)
+--                                   g = (evalStmt2 g e1) in
+--                                   putStr (evalAllWT g s)
+--                   Left e2  -> error (show e2)
+--                   where s = Map.empty
+--                         g = []
 par [fs] = do
   prog <- (parseFromFile program (fs))
   case prog of
