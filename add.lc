@@ -1,0 +1,5 @@
+let zero = lambda s z. z;
+let succ = lambda n. lambda s z. s (n s z);
+let plus = lambda m n. m succ n;
+let two = succ (succ zero);
+plus two zero

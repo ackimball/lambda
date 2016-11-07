@@ -1,0 +1,3 @@
+let false = lambda a b. b;
+let true = lambda a b. a;
+false
