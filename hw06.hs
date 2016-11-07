@@ -13,6 +13,8 @@ import qualified Data.Map as Map
 import Data.Map (Map, findWithDefault, (!))
 import qualified Data.Set as Set
 import Data.Set (Set)
+import System( getArgs )
+import System.Console.GetOpt
 
 type VarName = String
 
@@ -201,6 +203,9 @@ fv (Lam x e) = Set.difference (fv e) (Set.singleton x)
 --e is closed IFF fv(e) = empty set
 isClosed :: LamExp -> Bool
 isClosed e = fv e == Set.empty
+
+options :: [OptDescr a]
+options = []
 
 main :: IO ()
 main = do
