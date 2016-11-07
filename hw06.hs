@@ -189,12 +189,12 @@ evalAll (l:ls) st = (evalAll ls st) ++ "\n" ++ (show (evalLam st l))
 evalAllWT :: [LamExp] -> Store -> String
 evalAllWT [] _ = "Running program"
 evalAllWT (l:ls) st = if (isClosed (evalLam st l)) then (evalAllWT ls st) ++ "\n" ++ (show (evalLam st l))
-                    else error (show (fv (evalLam st l))) ++ " are free variables in " ++ (show l)
+                    else error ((show (fv (evalLam st l))) ++ " are free variables in " ++ (show l))
 
 --Checking for free variables
 --(will be used with the -c flag)
 fv :: LamExp -> Set VarName
-fv (Var x) = Set.empty
+fv (Var x) = Set.singleton x 
 fv (App e1 e2) = Set.union (fv e1) (fv e2)
 fv (Lam x e) = Set.difference (fv e) (Set.singleton x)
 
