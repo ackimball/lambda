@@ -27,6 +27,7 @@ data LamExp =
   | Lam VarName LamExp
   deriving Eq
 
+
 data Stmt =
       Let VarName LamExp
     | Exp LamExp
@@ -50,6 +51,11 @@ test1 = Var "x"
 test2 = Var "y"
 test3 = Lam "x" test2
 test4 = Lam "y" (App test1 test2)
+
+one = Lam "s" (Lam "z" (App (Var "s") (App (App (Lam "s" (Lam "z" (Var "z"))) (Var "s")) (Var "z"))))
+asdf = (App (Var "s") (App (App (Lam "s" (Lam "z" (Var "z"))) (Var "s")) (Var "z")))
+
+successor = (Lam "n" (Lam "s" (Lam "z" (App (Var "s") (App (App (Var "n") (Var "s")) (Var "z"))))))
 
 type Parser = Parsec String ()
 
@@ -165,7 +171,6 @@ subst (Lam y e1) x e2 = if y == x then (subst e1 x e2) else (Lam y (subst e1 x e
 
 
 -- Interpreter for LC
--- So this needs to use substitution somehow
 evalLam :: Store -> LamExp -> LamExp
 evalLam st (Var x) = findWithDefault (Var x) x st
 evalLam st (Lam x la) = Lam x (evalLam st la)
@@ -189,6 +194,10 @@ evalAll :: [LamExp] -> Store -> String
 evalAll [] _ = "Running program"
 evalAll (l:ls) st = (evalAll ls st) ++ "\n" ++ (show (evalLam st l))
 
+evalAllChurch :: [LamExp] -> Store -> String
+evalAllChurch [] _ = "Running program"
+evalAllChurch (l:ls) st = (evalAllChurch ls st) ++ "\n" ++ (show (convert (evalLam st l)))
+
 
 evalAllWT :: [LamExp] -> Store -> String
 evalAllWT [] _ = "Running program"
@@ -202,10 +211,16 @@ fv (Var x) = Set.singleton x
 fv (App e1 e2) = Set.union (fv e1) (fv e2)
 fv (Lam x e) = Set.difference (fv e) (Set.singleton x)
 
+convert :: LamExp -> Int
+convert (Var x) = error "mad"
+convert (Lam "s" (Lam "z" (Var "z"))) = 0
+convert (Lam "s" (Lam "z" e)) = convert e
+convert (App (Var "s") e2) = (1 + (convert e2) )
+convert _ = error "mad"
+
 --e is closed IFF fv(e) = empty set
 isClosed :: LamExp -> Bool
 isClosed e = fv e == Set.empty
-
 
 main :: IO ()
 main = getArgs >>= par
@@ -226,7 +241,7 @@ par ["-n", fs] = do
   case prog of
         Right e1 -> let stores = (evalStmt s e1)
                         lams = (evalStmt2 g e1) in
-                        putStr (evalAllWT lams stores)
+                        putStr (evalAllChurch lams stores)
 
         Left e2  -> error (show e2)
         where s = Map.empty
@@ -256,7 +271,7 @@ par ["-c"] = do
   case (regularParse program input) of
                    Right e1 -> let s = (evalStmt s e1)
                                    g = (evalStmt2 g e1) in
-                                   putStr (evalAll g s)
+                                   putStr (evalAllWT g s)
                    Left e2  -> error (show e2)
                    where s = Map.empty
                          g = []
@@ -265,7 +280,7 @@ par ["-n"] = do
   case (regularParse program input) of
                    Right e1 -> let s = (evalStmt s e1)
                                    g = (evalStmt2 g e1) in
-                                   putStr (evalAll g s)
+                                   putStr (evalAllChurch g s)
                    Left e2  -> error (show e2)
                    where s = Map.empty
                          g = []
@@ -274,7 +289,7 @@ par ["-cn"] = do
   case (regularParse program input) of
                    Right e1 -> let s = (evalStmt s e1)
                                    g = (evalStmt2 g e1) in
-                                   putStr (evalAll g s)
+                                   putStr (evalAllWT g s)
                    Left e2  -> error (show e2)
                    where s = Map.empty
                          g = []
@@ -283,7 +298,7 @@ par ["-nc"] = do
   case (regularParse program input) of
                    Right e1 -> let s = (evalStmt s e1)
                                    g = (evalStmt2 g e1) in
-                                   putStr (evalAll g s)
+                                   putStr (evalAllWT g s)
                    Left e2  -> error (show e2)
                    where s = Map.empty
                          g = []
@@ -292,7 +307,7 @@ par [fs] = do
   case prog of
         Right e1 -> let stores = (evalStmt s e1)
                         lams = (evalStmt2 g e1) in
-                        putStr (evalAllWT lams stores)
+                        putStr (evalAll lams stores)
 
         Left e2  -> error (show e2)
         where s = Map.empty
@@ -340,3 +355,4 @@ errorExit = exitWith (ExitFailure 1)
 --                   Left e2  -> error (show e2)
 --                   where s = Map.empty
 --                         g = []
+
