@@ -210,7 +210,6 @@ isClosed e = fv e == Set.empty
 main :: IO ()
 main = getArgs >>= par
 
-
 par ["-h"] = usage >> exit
 par ["-c", fs] = do
   prog <- (parseFromFile program (fs))
@@ -280,6 +279,25 @@ par ["-cn"] = do
                    where s = Map.empty
                          g = []
 par ["-nc"] = do
+  input <- getContents
+  case (regularParse program input) of
+                   Right e1 -> let s = (evalStmt s e1)
+                                   g = (evalStmt2 g e1) in
+                                   putStr (evalAll g s)
+                   Left e2  -> error (show e2)
+                   where s = Map.empty
+                         g = []
+par [fs] = do
+  prog <- (parseFromFile program (fs))
+  case prog of
+        Right e1 -> let stores = (evalStmt s e1)
+                        lams = (evalStmt2 g e1) in
+                        putStr (evalAllWT lams stores)
+
+        Left e2  -> error (show e2)
+        where s = Map.empty
+              g = []
+par [] = do
   input <- getContents
   case (regularParse program input) of
                    Right e1 -> let s = (evalStmt s e1)
