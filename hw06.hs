@@ -25,7 +25,9 @@ data LamExp =
     Var VarName
   | App LamExp LamExp
   | Lam VarName LamExp
-  deriving Eq
+  | Zero 
+  | Succ LamExp 
+  deriving (Show,Eq)
 
 
 data Stmt =
@@ -36,15 +38,15 @@ data Stmt =
 
 
 
-instance Show LamExp where
-  show = show' 0 where
-    show' _ (Var v) = v
-    show' z (App la1 la2)
-     | z < 1 = show' 1 la1 ++ " " ++ show' 1 la2
-     | otherwise = "(" ++ show' 1 la1 ++ " " ++ show' 1 la2 ++ ")"
-    show' z (Lam x la)
-     | z < 1 = "lambda " ++ show' 1 (Var x) ++ ". " ++ show' 1 la
-     | otherwise = "(" ++ "lambda " ++ show' 1 (Var x) ++ ". " ++ show' 1 la ++ ")"
+--instance Show LamExp where
+--  show = show' 0 where
+--    show' _ (Var v) = v
+--    show' z (App la1 la2)
+--     | z < 1 = show' 1 la1 ++ " " ++ show' 1 la2
+--     | otherwise = "(" ++ show' 1 la1 ++ " " ++ show' 1 la2 ++ ")"
+--    show' z (Lam x la)
+--     | z < 1 = "lambda " ++ show' 1 (Var x) ++ ". " ++ show' 1 la
+--     | otherwise = "(" ++ "lambda " ++ show' 1 (Var x) ++ ". " ++ show' 1 la ++ ")"
 
 
 test1 = Var "x"
@@ -56,7 +58,7 @@ one = Lam "s" (Lam "z" (App (Var "s") (App (App (Lam "s" (Lam "z" (Var "z"))) (V
 asdf = (App (Var "s") (App (App (Lam "s" (Lam "z" (Var "z"))) (Var "s")) (Var "z")))
 
 successor = (Lam "n" (Lam "s" (Lam "z" (App (Var "s") (App (App (Var "n") (Var "s")) (Var "z"))))))
-
+zero = (Lam "s" (Lam "z" (Var "z")))
 type Parser = Parsec String ()
 
 
@@ -179,6 +181,14 @@ evalLam st (App l1@(Lam v1 e1) l2) = case l2 of
                               e@_ -> evalLam st (app l1 (evalLam st l2))
 evalLam st (App e@_ l2) = evalLam st (app (evalLam st e) l2  )
 
+evalLamC :: Store -> LamExp -> LamExp
+evalLamC st (Var x) = findWithDefault (Var x) x st
+evalLamC st (Lam x la) = Lam x (evalLamC st la)
+evalLamC st (App l1@(Lam v1 e1) l2) = case l2 of
+                              (Lam var expr) -> subst l1 v1 l2
+                              e@_ -> evalLamC st (app l1 (evalLamC st l2))
+evalLamC st (App e@_ l2) = evalLamC st (app (evalLamC st e) l2  )
+
 -- Interpreter for Statements
 evalStmt :: Store -> Stmt -> Store
 evalStmt st (Let x l) = Map.insert x l st
@@ -196,7 +206,7 @@ evalAll (l:ls) st = (evalAll ls st) ++ "\n" ++ (show (evalLam st l))
 
 evalAllChurch :: [LamExp] -> Store -> String
 evalAllChurch [] _ = "Running program"
-evalAllChurch (l:ls) st = (evalAllChurch ls st) ++ "\n" ++ (show (convert (evalLam st l)))
+evalAllChurch (l:ls) st = (evalAllChurch ls st) ++ "\n" ++ (show (convert2 (evalLam st l)))
 
 
 evalAllWT :: [LamExp] -> Store -> String
@@ -213,10 +223,15 @@ fv (Lam x e) = Set.difference (fv e) (Set.singleton x)
 
 convert :: LamExp -> Int
 convert (Var x) = error "mad"
-convert (Lam "s" (Lam "z" (Var "z"))) = 0
-convert (Lam "s" (Lam "z" e)) = convert e
-convert (App (Var "s") e2) = (1 + (convert e2) )
-convert _ = error "mad"
+convert (Lam x e1) = error "mad"
+convert (App e1 e2) = error "mad"
+convert Zero = 0
+convert (Succ lam) = 1 + (convert lam)
+
+convert2 :: LamExp -> LamExp
+convert2 (Lam "s" (Lam "z" (Var "z"))) = Zero
+convert2 (App e1 e2) = if (e1 == successor) then Succ (convert2 e2) else error "mad"
+convert2 _ = error "mad"
 
 --e is closed IFF fv(e) = empty set
 isClosed :: LamExp -> Bool
@@ -241,7 +256,7 @@ par ["-n", fs] = do
   case prog of
         Right e1 -> let stores = (evalStmt s e1)
                         lams = (evalStmt2 g e1) in
-                        putStr (evalAllChurch lams stores)
+                        putStr (evalAll lams stores)
 
         Left e2  -> error (show e2)
         where s = Map.empty
@@ -280,7 +295,7 @@ par ["-n"] = do
   case (regularParse program input) of
                    Right e1 -> let s = (evalStmt s e1)
                                    g = (evalStmt2 g e1) in
-                                   putStr (evalAllChurch g s)
+                                   putStr (show e1)
                    Left e2  -> error (show e2)
                    where s = Map.empty
                          g = []
