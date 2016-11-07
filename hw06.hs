@@ -24,25 +24,25 @@ data LamExp =
     Var VarName
   | App LamExp LamExp
   | Lam VarName LamExp
-  deriving Eq
+  deriving (Show, Eq)
 
 data Stmt =
       Let VarName LamExp
     | Exp LamExp
-    | Seq Stmt Stmt 
+    | Seq Stmt Stmt
    deriving (Show, Eq)
 
 
 
-instance Show LamExp where
-  show = show' 0 where
-    show' _ (Var v) = v
-    show' z (App la1 la2)
-     | z < 1 = show' 1 la1 ++ " " ++ show' 1 la2
-     | otherwise = "(" ++ show' 1 la1 ++ " " ++ show' 1 la2 ++ ")"
-    show' z (Lam x la)
-     | z < 1 = "lambda " ++ show' 1 (Var x) ++ ". " ++ show' 1 la
-     | otherwise = "(" ++ "lambda " ++ show' 1 (Var x) ++ ". " ++ show' 1 la ++ ")"
+-- instance Show LamExp where
+--   show = show' 0 where
+--     show' _ (Var v) = v
+--     show' z (App la1 la2)
+--      | z < 1 = show' 1 la1 ++ " " ++ show' 1 la2
+--      | otherwise = "(" ++ show' 1 la1 ++ " " ++ show' 1 la2 ++ ")"
+--     show' z (Lam x la)
+--      | z < 1 = "lambda " ++ show' 1 (Var x) ++ ". " ++ show' 1 la
+--      | otherwise = "(" ++ "lambda " ++ show' 1 (Var x) ++ ". " ++ show' 1 la ++ ")"
 
 
 test1 = Var "x"
@@ -98,7 +98,7 @@ ws :: Parser ()
 ws = void $ many $ oneOf " \n\t"
 
 lexp ::Parser LamExp
-lexp = ws *> (chainl1 (lamP <|> varP <|> (parens lexp)) op)
+lexp = ws *> (chainl1 (lamP <|> varP <|> (parens lexp)) (ws *> op))
 
 varP :: Parser LamExp
 varP =  Var <$> (ws *> var)
@@ -108,9 +108,9 @@ nonFirstChar = satisfy (\a -> isDigit a || isLetter a || a == '_')
 
 lamP :: Parser LamExp
 lamP = try oneArg <|> try multArgs
-        where 
-          oneArg = Lam <$> (((kw "lambda") *> var <* dot)) <*> lexp
-          multArgs = Lam <$> ((kw "lambda") *> var) <*> lamP2
+        where
+          oneArg = Lam <$> (ws *> ((kw "lambda") *> var <* dot)) <*> lexp
+          multArgs = Lam <$> (ws *> ((kw "lambda") *> var)) <*> lamP2
 
 lamP2 :: Parser LamExp
 lamP2 = try moreArgs <|> lastArg
@@ -123,7 +123,7 @@ op =
   do return app
 
 app :: LamExp -> LamExp -> LamExp
-app x y = App x y 
+app x y = App x y
 
 sc :: Parser Char
 sc = char ';'
@@ -136,8 +136,8 @@ program = seqParser
 
 seqParser :: Parser Stmt
 seqParser = ws *> (try (Seq <$> (stmtParser <* sc) <*> seqParser) <|> try stmtParser)
-  
-stmtParser :: Parser Stmt 
+
+stmtParser :: Parser Stmt
 stmtParser = try expCase <|> try letCase
           where
              expCase = Exp <$> lexp
@@ -150,13 +150,13 @@ subst (App e1 e2) x e3 = app (subst e1 x e3) (subst e2 x e3)
 subst (Lam y e1) x e2 = if y == x then (subst e1 x e2) else (Lam y (subst e1 x e2))
 
 -- EXAMPLE of how interpreter should work
--- If we parse test2, we get: 
+-- If we parse test2, we get:
 -- Seq (Let "zero" (Lam "s" (Lam "z" (Var "z")))) (Let "succ" (Lam "n" (Lam "s" (Lam "z" (App (Var "s") (App (App (Var "n") (Var "s")) (Var "z")))))))
 -- This is how we want that to be "interpreted":
 -- (Lam "s" (Lam "z" (App (Var "s") (App (App (Lam "s" (Lam "z" (App (Var "s") (App (App (Lam "s" (Lam "z" (Var "z"))) (Var "s")) (Var "z"))))) (Var "s")) (Var "z")))))
 -- Here are the steps:
 -- 1. evalStmt to get ride of the Seq, Let, etc. (done except for Exp, see comment)
--- 2. evalLam to make substitutions that go 
+-- 2. evalLam to make substitutions that go
 --   from:
 --   lambda s (lambda z. z) (lambda n . (lambda s. (lambda z (s ((n s) z)))))
 --   to:
@@ -171,7 +171,7 @@ evalLam st (Lam x la) = Lam x (evalLam st la)
 evalLam st (App l1@(Lam v1 e1) l2) = case l2 of
                               (Lam var expr) -> subst l1 v1 l2
                               e@_ -> evalLam st (app l1 (evalLam st l2))
-evalLam st (App e@_ l2) = evalLam st (app (evalLam st e) l2  )        
+evalLam st (App e@_ l2) = evalLam st (app (evalLam st e) l2  )
 
 -- Interpreter for Statements
 evalStmt :: Store -> Stmt -> Store
@@ -186,17 +186,18 @@ evalStmt2 l (Seq s1 s2) = (evalStmt2 (evalStmt2 l s1) s2)
 
 evalAll :: [LamExp] -> Store -> String
 evalAll [] _ = "Running program"
-evalAll (l:ls) st = (evalAll ls st) ++ "\n" ++ (show (evalLam st l)) 
- 
+evalAll (l:ls) st = (evalAll ls st) ++ "\n" ++ (show (evalLam st l))
+
+
 evalAllWT :: [LamExp] -> Store -> String
 evalAllWT [] _ = "Running program"
 evalAllWT (l:ls) st = if (isClosed (evalLam st l)) then (evalAllWT ls st) ++ "\n" ++ (show (evalLam st l))
-                    else error (show (fv (evalLam st l))) ++ " are free variables in " ++ (show l)
+                    else error ((show (fv (evalLam st l))) ++ " are free variables in " ++ (show l))
 
 --Checking for free variables
 --(will be used with the -c flag)
 fv :: LamExp -> Set VarName
-fv (Var x) = Set.empty
+fv (Var x) = Set.singleton x 
 fv (App e1 e2) = Set.union (fv e1) (fv e2)
 fv (Lam x e) = Set.difference (fv e) (Set.singleton x)
 
@@ -211,24 +212,23 @@ main :: IO ()
 main = do
     a <- getArgs
     case a of
-      [str] -> do 
+      [str] -> do
             prog <- (parseFromFile program str)
             case prog of
-                  Right e1 -> let stores = (evalStmt s e1) 
-                                  lams = (evalStmt2 g e1) in 
+                  Right e1 -> let stores = (evalStmt s e1)
+                                  lams = (evalStmt2 g e1) in
                                   putStr (evalAllWT lams stores)
+
                   Left e2  -> error (show e2)
                   where s = Map.empty
                         g = []
 
-      _ -> do 
-             input <- getContents 
+      _ -> do
+             input <- getContents
              case (regularParse program input) of
-                  Right e1 -> let s = (evalStmt s e1) 
-                                  g = (evalStmt2 g e1) in 
+                  Right e1 -> let s = (evalStmt s e1)
+                                  g = (evalStmt2 g e1) in
                                   putStr (evalAll g s)
                   Left e2  -> error (show e2)
                   where s = Map.empty
                         g = []
-
-
