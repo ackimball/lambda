@@ -288,14 +288,16 @@ par ["-nc"] = do
                    Left e2  -> error (show e2)
                    where s = Map.empty
                          g = []
+par _ = errorExit
 
 
-usage   =  do putStrLn "interp [OPTIONS] FILE (defaults to -, for stdin)"
-              putStrLn "  lambda calculus interpreter"
-              putStrLn "  -c --check    Check scope"
-              putStrLn "  -n --numeral  Convert final Church numeral to a number"
-              putStrLn "  -? --help     Display help message]"
+usage =  do putStrLn "interp [OPTIONS] FILE (defaults to -, for stdin)"
+            putStrLn "  lambda calculus interpreter"
+            putStrLn "  -c --check    Check scope"
+            putStrLn "  -n --numeral  Convert final Church numeral to a number"
+            putStrLn "  -? --help     Display help message]"
 exit = exitWith ExitSuccess
+errorExit = exitWith (ExitFailure 1)
 
 -- main = do
 --     a <- getArgs
