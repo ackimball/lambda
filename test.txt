@@ -1,3 +1,6 @@
-let zero = lambda z. z;
-let horse = lambda h. h;
-horse zero;
+let true = lambda a b . a;
+let false = lambda a b . b;
+let not = lambda b . lambda x y. b y x;
+not;
+true;
+not true
