@@ -181,14 +181,6 @@ evalLam st (App l1@(Lam v1 e1) l2) = case l2 of
                               e@_ -> evalLam st (app l1 (evalLam st l2))
 evalLam st (App e@_ l2) = evalLam st (app (evalLam st e) l2  )
 
-evalLamC :: Store -> LamExp -> LamExp
-evalLamC st (Var x) = findWithDefault (Var x) x st
-evalLamC st (Lam x la) = Lam x (evalLamC st la)
-evalLamC st (App l1@(Lam v1 e1) l2) = case l2 of
-                              (Lam var expr) -> subst l1 v1 l2
-                              e@_ -> evalLamC st (app l1 (evalLamC st l2))
-evalLamC st (App e@_ l2) = evalLamC st (app (evalLamC st e) l2  )
-
 -- Interpreter for Statements
 evalStmt :: Store -> Stmt -> Store
 evalStmt st (Let x l) = Map.insert x l st
@@ -206,7 +198,7 @@ evalAll (l:ls) st = (evalAll ls st) ++ "\n" ++ (show (evalLam st l))
 
 evalAllChurch :: [LamExp] -> Store -> String
 evalAllChurch [] _ = "Running program"
-evalAllChurch (l:ls) st = (evalAllChurch ls st) ++ "\n" ++ (show (convert2 (evalLam st l)))
+evalAllChurch (l:ls) st = (evalAllChurch ls st) ++ "\n" ++ (show (convert (convert2 st (l))))
 
 
 evalAllWT :: [LamExp] -> Store -> String
@@ -228,10 +220,12 @@ convert (App e1 e2) = error "mad"
 convert Zero = 0
 convert (Succ lam) = 1 + (convert lam)
 
-convert2 :: LamExp -> LamExp
-convert2 (Lam "s" (Lam "z" (Var "z"))) = Zero
-convert2 (App e1 e2) = if (e1 == successor) then Succ (convert2 e2) else error "mad"
-convert2 _ = error "mad"
+convert2 :: Store -> LamExp -> LamExp
+convert2 st (Var x) = convert2 st (st ! x)
+convert2 st (Lam "s" (Lam "z" (Var "z"))) = Zero
+convert2 st (App (Var x) e@_) = convert2 st (App (st ! x) e)
+convert2 st (App e1 e2) = if (e1 == successor) then Succ (convert2 st e2) else error "mad"
+convert2 st _ = error "mad"
 
 --e is closed IFF fv(e) = empty set
 isClosed :: LamExp -> Bool
@@ -256,7 +250,7 @@ par ["-n", fs] = do
   case prog of
         Right e1 -> let stores = (evalStmt s e1)
                         lams = (evalStmt2 g e1) in
-                        putStr (evalAll lams stores)
+                        putStr (evalAllChurch lams stores)
 
         Left e2  -> error (show e2)
         where s = Map.empty
@@ -346,6 +340,17 @@ usage =  do putStrLn "interp [OPTIONS] FILE (defaults to -, for stdin)"
             putStrLn "  -? --help     Display help message]"
 exit = exitWith ExitSuccess
 errorExit = exitWith (ExitFailure 1)
+
+
+test = "let zero = lambda s z. z; let succ = lambda n. lambda s z. s (n s z); succ zero"
+
+Right testParsed = regularParse program test
+testSt = (evalStmt Map.empty testParsed)
+(testLam:rest)= (evalStmt2 [] testParsed)
+lam1 = convert2 testSt testLam
+num = convert lam1
+
+
 
 -- main = do
 --     a <- getArgs
