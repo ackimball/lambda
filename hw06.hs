@@ -61,6 +61,8 @@ asdf = (App (Var "s") (App (App (Lam "s" (Lam "z" (Var "z"))) (Var "s")) (Var "z
 successor = (Lam "n" (Lam "s" (Lam "z" (App (Var "s") (App (App (Var "n") (Var "s")) (Var "z"))))))
 zero = (Lam "s" (Lam "z" (Var "z")))
 
+omega = (Lam "x" (App (Var "x") (Var "x")))
+
 type Parser = Parsec String ()
 
 
@@ -176,12 +178,14 @@ subst (Lam y e1) x e2 = if y == x then (subst e1 x e2) else (Lam y (subst e1 x e
 
 -- Interpreter for LC
 evalLam :: Store -> LamExp -> LamExp
-evalLam st (Var x) = findWithDefault (Var x) x st
+--evalLam st (Var x) = if ((findWithDefault (Var x) x st) == (Var x)) then (Var x) else (evalLam st (findWithDefault (Var x) x st))
+evalLam st (Var x) = (findWithDefault (Var x) x st)
 evalLam st (Lam x la) = Lam x (evalLam st la)
 evalLam st (App l1@(Lam v1 e1) l2) = case l2 of
                               (Lam var expr) -> subst l1 v1 l2
                               e@_ -> evalLam st (app l1 (evalLam st l2))
-evalLam st (App e@_ l2) = evalLam st (app (evalLam st e) l2  )
+evalLam st (App e@_ l2) = (evalLam st (app (evalLam st e) l2  ))
+
 
 -- Interpreter for Statements
 evalStmt :: Store -> Stmt -> Store
@@ -227,9 +231,9 @@ convert Zero = 0
 convert (Succ lam) = 1 + (convert lam)
 
 convert2 :: Store -> LamExp -> LamExp
-convert2 st (Var x) = convert2 st (st ! x)
+convert2 st (Var x) = convert2 st (findWithDefault (Var x) x st)
 convert2 st (Lam "s" (Lam "z" (Var "z"))) = Zero
-convert2 st (App (Var x) e@_) = convert2 st (App (st ! x) e)
+convert2 st (App (Var x) e@_) = convert2 st (App (findWithDefault (Var x) x st) e)
 convert2 st e@(App e1 e2) = if (e1 == successor) then Succ (convert2 st e2) else error ("Couldn't extract a number from " ++ (show e))
 convert2 st e@_ = error ("Couldn't extract a number from " ++ (show e))
 
@@ -277,6 +281,16 @@ par ["-nc", fs] = do
         Right e1 -> let stores = (evalStmt s e1)
                         lams = (evalStmt2 g e1) in
                         putStr (evalAllChurchWT lams stores)
+
+        Left e2  -> error (show e2)
+        where s = Map.empty
+              g = []
+par ["-d", fs] = do
+  prog <- (parseFromFile program (fs))
+  case prog of
+        Right e1 -> let stores = (evalStmt s e1)
+                        lams = (evalStmt2 g e1) in
+                        putStr ("The parsed bare expressions are: " ++ "\n\n" ++ (show lams) ++ "\n\n" ++ "The parsed vars are: " ++ "\n\n" ++ (show stores))
 
         Left e2  -> error (show e2)
         where s = Map.empty
@@ -330,9 +344,9 @@ par [fs] = do
 par [] = do
   input <- getContents
   case (regularParse program input) of
-                   Right e1 -> let s = (evalStmt s e1)
-                                   g = (evalStmt2 g e1) in
-                                   putStr (evalAll g s)
+                   Right e1 -> let stores = (evalStmt s e1)
+                                   lams = (evalStmt2 g e1) in
+                                   putStr (evalAll lams stores)
                    Left e2  -> error (show e2)
                    where s = Map.empty
                          g = []
@@ -355,6 +369,9 @@ testSt = (evalStmt Map.empty testParsed)
 (testLam:rest)= (evalStmt2 [] testParsed)
 lam1 = convert2 testSt testLam
 num = convert lam1
+
+testSt2 = Map.insert "omega" omega testSt
+testInf = evalLam testSt2 (App omega omega)
 
 
 
@@ -381,4 +398,9 @@ num = convert lam1
 --                   Left e2  -> error (show e2)
 --                   where s = Map.empty
 --                         g = []
+
+
+-- lambda s. (lambda z. (s (((lambda s. (lambda z. (s (((lambda s. (lambda z. z)) s) z)))) s) z)))
+
+-- ((lambda s. (lambda z. (s (((lambda s. (lambda z. z)) s) z)))) succ) (lambda s. (lambda z. (s (((lambda s. (lambda z. z)) s) z))))
 
