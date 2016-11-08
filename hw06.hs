@@ -105,7 +105,7 @@ kw s = (lexeme . try) (p >>= check)
                 else return x
 
 ws :: Parser ()
-ws = void $ many $ oneOf " \n\t"
+ws = void $ many $ oneOf " \n"
 
 lexp ::Parser LamExp
 lexp = ws *> (chainl1 (lamP <|> varP <|> (parens lexp)) (ws *> op))
@@ -136,7 +136,7 @@ app :: LamExp -> LamExp -> LamExp
 app x y = App x y
 
 sc :: Parser Char
-sc = char ';'
+sc = ws *> (char ';') <* ws
 
 nl :: Parser Char
 nl = ws *> satisfy (=='\n')
@@ -145,33 +145,32 @@ program :: Parser Stmt
 program = seqParser
 
 seqParser :: Parser Stmt
-seqParser = ws *> (try (Seq <$> (stmtParser <* sc) <*> seqParser) <|> try stmtParser)
+seqParser = ws *> (try (Seq <$> (stmtParser) <*> seqParser) <|> try stmtParserEnd <|> try stmtParserEnd2)
 
 stmtParser :: Parser Stmt
-stmtParser = try expCase <|> try letCase
+stmtParser = expCase <|> letCase
           where
-             expCase = Exp <$> lexp
-             letCase = Let <$> ((kw "let") *> var <* (char '=')) <*> lexp
+             expCase = Exp <$> lexp <* sc
+             letCase = Let <$> ((kw "let") *> var <* (char '=')) <*> lexp <* sc
+
+
+stmtParserEnd :: Parser Stmt
+stmtParserEnd = expCase <|> letCase
+          where
+             expCase = Exp <$> lexp <* eof
+             letCase = Let <$> ((kw "let") *> var <* (char '=')) <*> lexp <* eof
+
+stmtParserEnd2 :: Parser Stmt
+stmtParserEnd2 = expCase <|> letCase
+          where
+             expCase = Exp <$> lexp <* sc <* eof
+             letCase = Let <$> ((kw "let") *> var <* (char '=')) <*> lexp <* sc <* eof
 
 --Substitution
 subst :: LamExp -> VarName -> LamExp -> LamExp
 subst v@(Var y) x e = if (y == x) then e else v
 subst (App e1 e2) x e3 = app (subst e1 x e3) (subst e2 x e3)
 subst (Lam y e1) x e2 = if y == x then (subst e1 x e2) else (Lam y (subst e1 x e2))
-
--- EXAMPLE of how interpreter should work
--- If we parse test2, we get:
--- Seq (Let "zero" (Lam "s" (Lam "z" (Var "z")))) (Let "succ" (Lam "n" (Lam "s" (Lam "z" (App (Var "s") (App (App (Var "n") (Var "s")) (Var "z")))))))
--- This is how we want that to be "interpreted":
--- (Lam "s" (Lam "z" (App (Var "s") (App (App (Lam "s" (Lam "z" (App (Var "s") (App (App (Lam "s" (Lam "z" (Var "z"))) (Var "s")) (Var "z"))))) (Var "s")) (Var "z")))))
--- Here are the steps:
--- 1. evalStmt to get ride of the Seq, Let, etc. (done except for Exp, see comment)
--- 2. evalLam to make substitutions that go
---   from:
---   lambda s (lambda z. z) (lambda n . (lambda s. (lambda z (s ((n s) z)))))
---   to:
---   lambda s z. s ((lambda s z. s ((lambda s z. z) s z)) s z)
-
 
 -- Interpreter for LC
 evalLam :: Store -> LamExp -> LamExp
