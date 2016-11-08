@@ -46,6 +46,22 @@ instance Show LamExp where
      | z < 1 = "lambda " ++ show' 1 (Var x) ++ ". " ++ show' 1 la
      | otherwise = "(" ++ "lambda " ++ show' 1 (Var x) ++ ". " ++ show' 1 la ++ ")"
 
+
+--instance Show LamExp where
+--  show = show'' 0 0 where
+--    show'' _ _ (Var v) = v
+--    show'' z za (App la1 la2)
+--     | za < 1 = show'' z 1 la1 ++ " " ++ show'' z 1 la2
+--     | otherwise = "(" ++ show'' z 1 la1 ++ " " ++ show'' z 1 la2 ++ ")"
+--    show'' z za (Lam x la)
+--     | (z < 1) = case la of 
+--                   (Lam v1 la2) -> "lambda " ++ show'' 1 za (Var x) ++ " " ++ show'' (z + 1) za la
+--                   _ -> "lambda " ++ show'' 1 za (Var x) ++ ". " ++ show'' 0 za la
+--     | otherwise = case la of
+--                       (Lam v1 la2) -> show'' 1 za (Var x) ++ " " ++ show'' (z + 1) za la
+--                       _ -> show'' 1 za (Var x) ++ ". " ++ show'' 0 za la
+
+
 test1 = Var "x"
 test2 = Var "y"
 test3 = Lam "x" test2
@@ -174,12 +190,13 @@ subst (Lam y e1) x e2 = if y == x then (subst e1 x e2) else (Lam y (subst e1 x e
 
 -- Interpreter for LC
 evalLam :: Store -> LamExp -> LamExp
---evalLam st (Var x) = if ((findWithDefault (Var x) x st) == (Var x)) then (Var x) else (evalLam st (findWithDefault (Var x) x st))
 evalLam st (Var x) = (findWithDefault (Var x) x st)
+--evalLam st v@(Var x) = if ((findWithDefault (Var x) x st) == v) then v else (evalLam st (st ! x))
 evalLam st (Lam x la) = Lam x (evalLam st la)
 evalLam st (App l1@(Lam v1 e1) l2) = case l2 of
                               (Lam var expr) -> subst l1 v1 l2
                               e@_ -> evalLam st (app l1 (evalLam st l2))
+--evalLam st (App l1@(Lam v1 e1) l2) = subst l1 v1 l2
 evalLam st (App e@_ l2) = (evalLam st (app (evalLam st e) l2  ))
 
 
@@ -365,6 +382,8 @@ usage =  do putStrLn "interp [OPTIONS] FILE (defaults to -, for stdin)"
 exit = exitWith ExitSuccess
 errorExit = exitWith (ExitFailure 1)
 
+Right plus = regularParse lexp "lambda m n. m lambda n. lambda s z. s (n s z) n"
+
 
 test = "let zero = lambda s z. z; let succ = lambda n. lambda s z. s (n s z); succ zero"
 
@@ -376,7 +395,7 @@ num = convert lam1
 
 testSt2 = Map.insert "omega" omega testSt
 testInf = evalLam testSt2 (App omega omega)
-
+testPlus = evalLam testSt (App (App plus one) one)
 
 
 -- main = do
