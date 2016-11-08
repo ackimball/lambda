@@ -25,8 +25,8 @@ data LamExp =
     Var VarName
   | App LamExp LamExp
   | Lam VarName LamExp
-  | Zero 
-  | Succ LamExp 
+  | Zero
+  | Succ LamExp
   deriving Eq
 
 
@@ -35,8 +35,6 @@ data Stmt =
     | Exp LamExp
     | Seq Stmt Stmt
    deriving (Show, Eq)
-
-
 
 instance Show LamExp where
   show = show' 0 where
@@ -47,7 +45,6 @@ instance Show LamExp where
     show' z (Lam x la)
      | z < 1 = "lambda " ++ show' 1 (Var x) ++ ". " ++ show' 1 la
      | otherwise = "(" ++ "lambda " ++ show' 1 (Var x) ++ ". " ++ show' 1 la ++ ")"
-
 
 test1 = Var "x"
 test2 = Var "y"
@@ -250,7 +247,7 @@ par ["-c", fs] = do
   case prog of
         Right e1 -> let stores = (evalStmt s e1)
                         lams = (evalStmt2 g e1) in
-                        putStr (evalAllWT lams stores)
+                        putStrLn (evalAllWT lams stores)
 
         Left e2  -> error (show e2)
         where s = Map.empty
@@ -260,7 +257,7 @@ par ["-n", fs] = do
   case prog of
         Right e1 -> let stores = (evalStmt s e1)
                         lams = (evalStmt2 g e1) in
-                        putStr (evalAllChurch lams stores)
+                        putStrLn (evalAllChurch lams stores)
 
         Left e2  -> error (show e2)
         where s = Map.empty
@@ -270,7 +267,7 @@ par ["-cn", fs] = do
   case prog of
         Right e1 -> let stores = (evalStmt s e1)
                         lams = (evalStmt2 g e1) in
-                        putStr (evalAllChurchWT lams stores)
+                        putStrLn (evalAllChurchWT lams stores)
 
         Left e2  -> error (show e2)
         where s = Map.empty
@@ -280,7 +277,7 @@ par ["-nc", fs] = do
   case prog of
         Right e1 -> let stores = (evalStmt s e1)
                         lams = (evalStmt2 g e1) in
-                        putStr (evalAllChurchWT lams stores)
+                        putStrLn (evalAllChurchWT lams stores)
 
         Left e2  -> error (show e2)
         where s = Map.empty
@@ -288,70 +285,78 @@ par ["-nc", fs] = do
 par ["-d", fs] = do
   prog <- (parseFromFile program (fs))
   case prog of
-        Right e1 -> let stores = (evalStmt s e1)
-                        lams = (evalStmt2 g e1) in
-                        putStr ("The parsed bare expressions are: " ++ "\n\n" ++ (show lams) ++ "\n\n" ++ "The parsed vars are: " ++ "\n\n" ++ (show stores))
+    Right e1 -> let stores = (evalStmt s e1)
+                    lams = (evalStmt2 g e1) in
+                    putStrLn ("The parsed bare expressions are: " ++ "\n" ++ (show lams) ++ "\n\n" ++ "The parsed vars are: " ++ "\n" ++ (show stores))
 
-        Left e2  -> error (show e2)
-        where s = Map.empty
-              g = []
---par ["-c"] = do
---  input <- getContents
---  case (regularParse program input) of
---                   Right e1 -> let s = (evalStmt s e1)
---                                   g = (evalStmt2 g e1) in
---                                   putStr (evalAllWT g s)
---                   Left e2  -> error (show e2)
---                   where s = Map.empty
---                         g = []
---par ["-n"] = do
---  input <- getContents
---  case (regularParse program input) of
---                   Right e1 -> let s = (evalStmt s e1)
---                                   g = (evalStmt2 g e1) in
---                                   putStr (evalAllChurch 
---                   Left e2  -> error (show e2)
---                   where s = Map.empty
---                         g = []
---par ["-cn"] = do
---  input <- getContents
---  case (regularParse program input) of
---                   Right e1 -> let s = (evalStmt s e1)
---                                   g = (evalStmt2 g e1) in
---                                   putStr (evalAllWT g s)
---                   Left e2  -> error (show e2)
---                   where s = Map.empty
---                         g = []
---par ["-nc"] = do
---  input <- getContents
---  case (regularParse program input) of
---                   Right e1 -> let s = (evalStmt s e1)
---                                   g = (evalStmt2 g e1) in
---                                   putStr (evalAllWT g s)
---                   Left e2  -> error (show e2)
---                   where s = Map.empty
---                         g = []
+    Left e2  -> error (show e2)
+    where s = Map.empty
+          g = []
+par ["-d"] = do
+  input <- getContents
+  case (regularParse program input) of
+    Right e1 -> let stores = (evalStmt s e1)
+                    lams = (evalStmt2 g e1) in
+                    putStrLn ("The parsed bare expressions are: " ++ "\n" ++ (show lams) ++ "\n\n" ++ "The parsed vars are: " ++ "\n" ++ (show stores))
+
+    Left e2  -> error (show e2)
+    where s = Map.empty
+          g = []
+par ["-c"] = do
+ input <- getContents
+ case (regularParse program input) of
+   Right e1 -> let stores = (evalStmt s e1)
+                   lams = (evalStmt2 g e1) in
+                   putStrLn (evalAllWT lams stores)
+   Left e2  -> error (show e2)
+   where s = Map.empty
+         g = []
+par ["-n"] = do
+ input <- getContents
+ case (regularParse program input) of
+   Right e1 -> let stores = (evalStmt s e1)
+                   lams = (evalStmt2 g e1) in
+                   putStrLn (evalAllChurch lams stores)
+   Left e2  -> error (show e2)
+   where s = Map.empty
+         g = []
+par ["-cn"] = do
+ input <- getContents
+ case (regularParse program input) of
+   Right e1 -> let stores = (evalStmt s e1)
+                   lams = (evalStmt2 g e1) in
+                   putStrLn (evalAllChurchWT lams stores)
+   Left e2  -> error (show e2)
+   where s = Map.empty
+         g = []
+par ["-nc"] = do
+ input <- getContents
+ case (regularParse program input) of
+   Right e1 -> let stores = (evalStmt s e1)
+                   lams = (evalStmt2 g e1) in
+                   putStrLn (evalAllChurchWT lams stores)
+   Left e2  -> error (show e2)
+   where s = Map.empty
+         g = []
 par [fs] = do
   prog <- (parseFromFile program (fs))
   case prog of
-        Right e1 -> let stores = (evalStmt s e1)
-                        lams = (evalStmt2 g e1) in
-                        putStr (evalAll lams stores)
-
-        Left e2  -> error (show e2)
-        where s = Map.empty
-              g = []
+    Right e1 -> let stores = (evalStmt s e1)
+                    lams = (evalStmt2 g e1) in
+                    putStrLn (evalAll lams stores)
+    Left e2  -> error (show e2)
+    where s = Map.empty
+          g = []
 par [] = do
   input <- getContents
   case (regularParse program input) of
-                   Right e1 -> let stores = (evalStmt s e1)
-                                   lams = (evalStmt2 g e1) in
-                                   putStr (evalAll lams stores)
-                   Left e2  -> error (show e2)
-                   where s = Map.empty
-                         g = []
+    Right e1 -> let stores = (evalStmt s e1)
+                    lams = (evalStmt2 g e1) in
+                    putStrLn (evalAll lams stores)
+    Left e2  -> error (show e2)
+    where s = Map.empty
+          g = []
 par _ = errorExit
-
 
 usage =  do putStrLn "interp [OPTIONS] FILE (defaults to -, for stdin)"
             putStrLn "  lambda calculus interpreter"
@@ -403,4 +408,3 @@ testInf = evalLam testSt2 (App omega omega)
 -- lambda s. (lambda z. (s (((lambda s. (lambda z. (s (((lambda s. (lambda z. z)) s) z)))) s) z)))
 
 -- ((lambda s. (lambda z. (s (((lambda s. (lambda z. z)) s) z)))) succ) (lambda s. (lambda z. (s (((lambda s. (lambda z. z)) s) z))))
-
