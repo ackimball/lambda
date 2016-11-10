@@ -211,7 +211,7 @@ evalStmt st (Exp l) = st
 evalStmt st (Seq s1 s2) = (evalStmt (evalStmt st s1) s2)
 
 evalStmt2 :: [LamExp] -> Stmt -> [LamExp]
-evalStmt2 l (Let x a) = (evalLam stl
+evalStmt2 l (Let x a) = l
 evalStmt2 l (Exp a) = (a:l)
 evalStmt2 l (Seq s1 s2) = (evalStmt2 (evalStmt2 l s1) s2)
 
