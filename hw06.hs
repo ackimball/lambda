@@ -51,15 +51,15 @@ instance Show LamExp where
 --  show = show'' 0 0 where
 --    show'' _ _ (Var v) = v
 --    show'' z za (App la1 la2)
---     | za < 1 = show'' z 1 la1 ++ " " ++ show'' z 1 la2
---     | otherwise = "(" ++ show'' z 1 la1 ++ " " ++ show'' z 1 la2 ++ ")"
+--     | za < 1 = show'' z 1 la1 ++ " app " ++ show'' z 1 la2
+--     | otherwise = "(" ++ show'' z 1 la1 ++ " app " ++ show'' z 1 la2 ++ ")"
 --    show'' z za (Lam x la)
 --     | (z < 1) = case la of 
---                   (Lam v1 la2) -> "lambda " ++ show'' 1 za (Var x) ++ " " ++ show'' (z + 1) za la
---                   _ -> "lambda " ++ show'' 1 za (Var x) ++ ". " ++ show'' 0 za la
+--                   (Lam v1 la2) -> "lambda " ++ show'' 1 za (Var x) ++ " " ++ show'' (z + 1) za la ++ ")"
+--                   _ -> "lambda " ++ show'' 1 za (Var x) ++ ". " ++ show'' 0 0 la
 --     | otherwise = case la of
 --                       (Lam v1 la2) -> show'' 1 za (Var x) ++ " " ++ show'' (z + 1) za la
---                       _ -> show'' 1 za (Var x) ++ ". " ++ show'' 0 za la
+--                       _ -> show'' 1 za (Var x) ++ ". " ++ show'' 0 0 la
 
 
 test1 = Var "x"
@@ -186,34 +186,38 @@ stmtParserEnd2 = expCase <|> letCase
 subst :: LamExp -> VarName -> LamExp -> LamExp
 subst v@(Var y) x e = if (y == x) then e else v
 subst (App e1 e2) x e3 = app (subst e1 x e3) (subst e2 x e3)
-subst (Lam y e1) x e2 = if y == x then (subst e1 x e2) else (Lam y (subst e1 x e2))
+subst (Lam y e1) x e2 = if y == x then (Lam y e1) else (Lam y (subst e1 x e2))
 
 -- Interpreter for LC
 evalLam :: Store -> LamExp -> LamExp
-evalLam st (Var x) = (findWithDefault (Var x) x st)
---evalLam st v@(Var x) = if ((findWithDefault (Var x) x st) == v) then v else (evalLam st (st ! x))
+--evalLam st (Var x) = (findWithDefault (Var x) x st)
+evalLam st v@(Var x) = if ((findWithDefault (Var x) x st) == v) then v else (evalLam st (st ! x))
 evalLam st (Lam x la) = Lam x (evalLam st la)
 evalLam st (App l1@(Lam v1 e1) l2) = case l2 of
-                              (Lam var expr) -> subst l1 v1 l2
-                              e@_ -> evalLam st (app l1 (evalLam st l2))
+                              (Lam var expr) -> (subst l1 v1 l2)
+                              (App a1 a2) -> evalLam st (app l1 (evalLam st l2))
+                              (Var v2) -> if ((findWithDefault (Var v2) v2 st) == l2) then (subst l1 v1 l2) else evalLam st (app l1 (evalLam st (st ! v2)))
 --evalLam st (App l1@(Lam v1 e1) l2) = subst l1 v1 l2
-evalLam st (App e@_ l2) = (evalLam st (app (evalLam st e) l2  ))
+evalLam st (App e@(Var x) l2) = if ((findWithDefault (Var x) x st) == e) then (app e (evalLam st l2)  ) else (evalLam st (app (evalLam st e) l2  ))
+evalLam st a@(App e@(App a1 a2) l2) = case (evalLam st e) of
+                                            (App d1 d2) -> (app e (evalLam st l2))
+                                            _ -> evalLam st (app (evalLam st e) l2)
 
 
 -- Interpreter for Statements
 evalStmt :: Store -> Stmt -> Store
-evalStmt st (Let x l) = Map.insert x l st
+evalStmt st (Let x l) = Map.insert x (evalLam st l) st
 evalStmt st (Exp l) = st
 evalStmt st (Seq s1 s2) = (evalStmt (evalStmt st s1) s2)
 
 evalStmt2 :: [LamExp] -> Stmt -> [LamExp]
-evalStmt2 l (Let x a) = l
+evalStmt2 l (Let x a) = (evalLam stl
 evalStmt2 l (Exp a) = (a:l)
 evalStmt2 l (Seq s1 s2) = (evalStmt2 (evalStmt2 l s1) s2)
 
 evalAll :: [LamExp] -> Store -> String
-evalAll [] _ = "Running program"
-evalAll (l:ls) st = (evalAll ls st) ++ "\n" ++ (show (evalLam st l))
+evalAll [] _ = ""
+evalAll (l:ls) st = (evalAll ls st) ++ (show (evalLam st l)) ++ "\n"
 
 evalAllChurch :: [LamExp] -> Store -> String
 evalAllChurch [] _ = "Running program"
@@ -394,6 +398,7 @@ lam1 = convert2 testSt testLam
 num = convert lam1
 
 testSt2 = Map.insert "omega" omega testSt
+testSt3 = Map.insert "one" one testSt
 testInf = evalLam testSt2 (App omega omega)
 testPlus = evalLam testSt (App (App plus one) one)
 
