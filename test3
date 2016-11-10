@@ -1,4 +1,4 @@
 let x = x;
 let y = lambda a . a;
 x;
-y;
+y (x);

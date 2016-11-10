@@ -8,4 +8,4 @@ let five = succ (succ (succ (succ (succ zero))));
 let plus = lambda m n. m succ n;
 let mult = lambda m n. m (plus n) zero;
 let fact = lambda Y. lambda factRec. lambda n. (isZero n) zero (mult n (factRec (pred n)));
-fact (five)
+zero
