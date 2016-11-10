@@ -54,7 +54,7 @@ instance Show LamExp where
 --     | za < 1 = show'' z 1 la1 ++ " app " ++ show'' z 1 la2
 --     | otherwise = "(" ++ show'' z 1 la1 ++ " app " ++ show'' z 1 la2 ++ ")"
 --    show'' z za (Lam x la)
---     | (z < 1) = case la of 
+--     | (z < 1) = case la of
 --                   (Lam v1 la2) -> "lambda " ++ show'' 1 za (Var x) ++ " " ++ show'' (z + 1) za la ++ ")"
 --                   _ -> "lambda " ++ show'' 1 za (Var x) ++ ". " ++ show'' 0 0 la
 --     | otherwise = case la of
@@ -220,17 +220,17 @@ evalAll [] _ = ""
 evalAll (l:ls) st = (evalAll ls st) ++ (show (evalLam st l)) ++ "\n"
 
 evalAllChurch :: [LamExp] -> Store -> String
-evalAllChurch [] _ = "Running program"
-evalAllChurch (l:ls) st = (evalAllChurch ls st) ++ "\n" ++ (show (convert (convert2 st (l))))
+evalAllChurch [] _ = ""
+evalAllChurch (l:ls) st = (evalAllChurch ls st) ++ (show (convert (convert2 st (l)))) ++ "\n"
 
 evalAllChurchWT :: [LamExp] -> Store -> String
-evalAllChurchWT [] _ = "Running program"
-evalAllChurchWT (l:ls) st = if (isClosed (evalLam st l)) then (evalAllChurch ls st) ++ "\n" ++ (show (convert (convert2 st (l))))
+evalAllChurchWT [] _ = ""
+evalAllChurchWT (l:ls) st = if (isClosed (evalLam st l)) then (evalAllChurch ls st) ++ (show (convert (convert2 st (l)))) ++ "\n"
                           else error ((show (fv (evalLam st l))) ++ " are free variables in " ++ (show l))
 
 evalAllWT :: [LamExp] -> Store -> String
-evalAllWT [] _ = "Running program"
-evalAllWT (l:ls) st = if (isClosed (evalLam st l)) then (evalAllWT ls st) ++ "\n" ++ (show (evalLam st l))
+evalAllWT [] _ = ""
+evalAllWT (l:ls) st = if (isClosed (evalLam st l)) then (evalAllWT ls st) ++ (show (evalLam st l)) ++ "\n"
                     else error ((show (fv (evalLam st l))) ++ " are free variables in " ++ (show l))
 
 --Checking for free variables
@@ -267,7 +267,7 @@ par ["-c", fs] = do
   case prog of
         Right e1 -> let stores = (evalStmt s e1)
                         lams = (evalStmt2 g e1) in
-                        putStrLn (evalAllWT lams stores)
+                        putStr (evalAllWT lams stores)
 
         Left e2  -> error (show e2)
         where s = Map.empty
@@ -277,7 +277,7 @@ par ["-n", fs] = do
   case prog of
         Right e1 -> let stores = (evalStmt s e1)
                         lams = (evalStmt2 g e1) in
-                        putStrLn (evalAllChurch lams stores)
+                        putStr (evalAllChurch lams stores)
 
         Left e2  -> error (show e2)
         where s = Map.empty
@@ -287,7 +287,7 @@ par ["-cn", fs] = do
   case prog of
         Right e1 -> let stores = (evalStmt s e1)
                         lams = (evalStmt2 g e1) in
-                        putStrLn (evalAllChurchWT lams stores)
+                        putStr (evalAllChurchWT lams stores)
 
         Left e2  -> error (show e2)
         where s = Map.empty
@@ -297,7 +297,7 @@ par ["-nc", fs] = do
   case prog of
         Right e1 -> let stores = (evalStmt s e1)
                         lams = (evalStmt2 g e1) in
-                        putStrLn (evalAllChurchWT lams stores)
+                        putStr (evalAllChurchWT lams stores)
 
         Left e2  -> error (show e2)
         where s = Map.empty
@@ -307,7 +307,7 @@ par ["-d", fs] = do
   case prog of
     Right e1 -> let stores = (evalStmt s e1)
                     lams = (evalStmt2 g e1) in
-                    putStrLn ("The parsed bare expressions are: " ++ "\n" ++ (show lams) ++ "\n\n" ++ "The parsed vars are: " ++ "\n" ++ (show stores))
+                    putStr ("The parsed bare expressions are: " ++ "\n" ++ (show lams) ++ "\n\n" ++ "The parsed vars are: " ++ "\n" ++ (show stores))
 
     Left e2  -> error (show e2)
     where s = Map.empty
@@ -317,7 +317,7 @@ par ["-d"] = do
   case (regularParse program input) of
     Right e1 -> let stores = (evalStmt s e1)
                     lams = (evalStmt2 g e1) in
-                    putStrLn ("The parsed bare expressions are: " ++ "\n" ++ (show lams) ++ "\n\n" ++ "The parsed vars are: " ++ "\n" ++ (show stores))
+                    putStr ("The parsed bare expressions are: " ++ "\n" ++ (show lams) ++ "\n\n" ++ "The parsed vars are: " ++ "\n" ++ (show stores))
 
     Left e2  -> error (show e2)
     where s = Map.empty
@@ -327,7 +327,7 @@ par ["-c"] = do
  case (regularParse program input) of
    Right e1 -> let stores = (evalStmt s e1)
                    lams = (evalStmt2 g e1) in
-                   putStrLn (evalAllWT lams stores)
+                   putStr (evalAllWT lams stores)
    Left e2  -> error (show e2)
    where s = Map.empty
          g = []
@@ -336,7 +336,7 @@ par ["-n"] = do
  case (regularParse program input) of
    Right e1 -> let stores = (evalStmt s e1)
                    lams = (evalStmt2 g e1) in
-                   putStrLn (evalAllChurch lams stores)
+                   putStr (evalAllChurch lams stores)
    Left e2  -> error (show e2)
    where s = Map.empty
          g = []
@@ -345,7 +345,7 @@ par ["-cn"] = do
  case (regularParse program input) of
    Right e1 -> let stores = (evalStmt s e1)
                    lams = (evalStmt2 g e1) in
-                   putStrLn (evalAllChurchWT lams stores)
+                   putStr (evalAllChurchWT lams stores)
    Left e2  -> error (show e2)
    where s = Map.empty
          g = []
@@ -354,7 +354,7 @@ par ["-nc"] = do
  case (regularParse program input) of
    Right e1 -> let stores = (evalStmt s e1)
                    lams = (evalStmt2 g e1) in
-                   putStrLn (evalAllChurchWT lams stores)
+                   putStr (evalAllChurchWT lams stores)
    Left e2  -> error (show e2)
    where s = Map.empty
          g = []
@@ -363,7 +363,7 @@ par [fs] = do
   case prog of
     Right e1 -> let stores = (evalStmt s e1)
                     lams = (evalStmt2 g e1) in
-                    putStrLn (evalAll lams stores)
+                    putStr (evalAll lams stores)
     Left e2  -> error (show e2)
     where s = Map.empty
           g = []
@@ -372,7 +372,7 @@ par [] = do
   case (regularParse program input) of
     Right e1 -> let stores = (evalStmt s e1)
                     lams = (evalStmt2 g e1) in
-                    putStrLn (evalAll lams stores)
+                    putStr (evalAll lams stores)
     Left e2  -> error (show e2)
     where s = Map.empty
           g = []
