@@ -13,6 +13,7 @@ import qualified Data.Map as Map
 import Data.Map (Map, findWithDefault, (!))
 import qualified Data.Set as Set
 import Data.Set (Set)
+import Data.Either
 import System.Exit
 import System.Environment
 
@@ -122,6 +123,11 @@ ws = void $ many $ oneOf " \n"
 --
 firstChar = satisfy (\a -> isLetter a || a == '_')
 nonFirstChar = satisfy (\a -> isDigit a || isLetter a || a == '_')
+
+
+main :: IO ()
+main = putStrLn "Does nothing yet"
+
 --
 -- lamP :: Parser LamExp
 -- lamP = try oneArg <|> try multArgs
@@ -290,3 +296,195 @@ nonFirstChar = satisfy (\a -> isDigit a || isLetter a || a == '_')
 -- testSt3 = Map.insert "one" one testSt
 -- testInf = evalLam testSt2 (App omega omega)
 -- testPlus = evalLam testSt (App (App plus one) one)
+
+
+--lamP :: Parser LamExp
+--lamP = try oneArg <|> try multArgs
+--        where
+--          oneArg = Lam <$> (ws *> ((kw "lambda") *> var <* dot)) <*> lexp
+--          multArgs = Lam <$> (ws *> ((kw "lambda") *> var)) <*> lamP2
+
+--lamP2 :: Parser LamExp
+--lamP2 = try moreArgs <|> lastArg
+--        where
+--          lastArg = Lam <$> (var <* dot) <*> lexp
+--          moreArgs = Lam <$> var <*> lamP2
+
+--op :: Parser (LamExp -> LamExp -> LamExp)
+--op =
+--  do return app
+
+--app :: LamExp -> LamExp -> LamExp
+--app x y = App x y
+
+--sc :: Parser Char
+--sc = ws *> (char ';') <* ws
+
+--nl :: Parser Char
+--nl = ws *> satisfy (=='\n')
+
+--program :: Parser Stmt
+--program = seqParser
+
+--seqParser :: Parser Stmt
+--seqParser = ws *> (try (Seq <$> (stmtParser) <*> seqParser) <|> try stmtParserEnd <|> try stmtParserEnd2)
+
+--stmtParser :: Parser Stmt
+--stmtParser = expCase <|> letCase
+--          where
+--             expCase = Exp <$> lexp <* sc
+--             letCase = Let <$> ((kw "let") *> var <* (char '=')) <*> lexp <* sc
+
+
+--stmtParserEnd :: Parser Stmt
+--stmtParserEnd = expCase <|> letCase
+--          where
+--             expCase = Exp <$> lexp <* eof
+--             letCase = Let <$> ((kw "let") *> var <* (char '=')) <*> lexp <* eof
+
+--stmtParserEnd2 :: Parser Stmt
+--stmtParserEnd2 = expCase <|> letCase
+--          where
+--             expCase = Exp <$> lexp <* sc <* eof
+--             letCase = Let <$> ((kw "let") *> var <* (char '=')) <*> lexp <* sc <* eof
+
+----Substitution
+--subst :: LamExp -> VarName -> LamExp -> LamExp
+--subst v@(Var y) x e = if (y == x) then e else v
+--subst (App e1 e2) x e3 = app (subst e1 x e3) (subst e2 x e3)
+--subst (Lam y e1) x e2 = if y == x then (Lam y e1) else (Lam y (subst e1 x e2))
+
+---- Interpreter for LC
+--evalLam :: Store -> LamExp -> Either error LamExp 
+--evalLam st v@(Var x) = Left (error ("Error: Undefined variable " ++ x))
+--evalLam st e@(Lam x la) = pure e
+--evalLam st (App e1 e2) = do 
+--                          v1 <- evalLam st e1
+--                          v2 <- evalLam st e2
+--                          case ((evalLam st e1), (evalLam st e2)) of
+--                               (Right (Lam x y), Right e@(Lam k z)) -> Right (subst y x e)
+--                               (Right c1,Left c2) -> Left (error c2)
+--                               (Left c1, Right c2) -> Left (error c1)
+--                               (Left c1, Left c2) -> Left (error c1)
+
+---- Interpreter for Statements
+--evalStmt :: Store -> Stmt -> Either error Store
+--evalStmt st (Let x l) = case (evalLam st (replaceVars st l)) of
+--                              Right e -> Right (Map.insert x e st)
+--                              Left e2 -> Left e2 
+--evalStmt st (Exp l) = Right st
+--evalStmt st (Seq s1 s2) = case (evalStmt st s1) of 
+--                                (Right e1) -> case (evalStmt e1 s2) of
+--                                                  Right k1 -> Right k1
+--                                                  Left k2 -> Left k2
+--                                (Left e2) -> Left e2
+
+--evalStmt2 :: Store -> [LamExp] -> Stmt -> Either error [LamExp]
+--evalStmt2 st l (Let x a) = Right l
+--evalStmt2 st l e@(Exp z) = case (evalLam st (replaceVars st z)) of
+--                                          Right e2 -> Right (e2:l)
+--                                          Left e3 -> Left e3                                         
+
+--evalStmt2 st l (Seq s1 s2) = case (evalStmt2 st l s1) of 
+--                                (Right e1) -> case (evalStmt2 st e1 s2) of
+--                                                  Right k1 -> Right k1
+--                                                  Left k2 -> Left k2
+--                                (Left e2) -> Left e2
+
+--replaceVars :: Store -> LamExp -> LamExp
+--replaceVars st (Var x) = if ((findWithDefault (Var x) x st) == (Var x)) then (Var x) else (replaceVars st (findWithDefault (Var x) x st))
+--replaceVars st (Lam x y) = Lam x (replaceVars st y)
+--replaceVars st (App x y) = App (replaceVars st x) (replaceVars st y)
+
+----Checking for free variables
+----(will be used with the -c flag)
+--fv :: LamExp -> Set VarName
+--fv (Var x) = Set.singleton x
+--fv (App e1 e2) = Set.union (fv e1) (fv e2)
+--fv (Lam x e) = Set.difference (fv e) (Set.singleton x)
+
+--convert :: LamExp -> Int
+--convert e@(Var x) = error ("Couldn't extract a number from " ++ (show e))
+--convert e@(Lam x e1) = error ("Couldn't extract a number from " ++ (show e))
+--convert e@(App e1 e2) = error ("Couldn't extract a number from " ++ (show e))
+--convert Zero = 0
+--convert (Succ lam) = 1 + (convert lam)
+
+--convert2 :: Store -> LamExp -> LamExp
+--convert2 st (Var x) = convert2 st (findWithDefault (Var x) x st)
+--convert2 st (Lam "s" (Lam "z" (Var "z"))) = Zero
+--convert2 st (App (Var x) e@_) = convert2 st (App (findWithDefault (Var x) x st) e)
+--convert2 st e@(App e1 e2) = if (e1 == successor) then Succ (convert2 st e2) else error ("Couldn't extract a number from " ++ (show e))
+--convert2 st e@_ = error ("Couldn't extract a number from " ++ (show e))
+
+----e is closed IFF fv(e) = empty set
+--isClosed :: LamExp -> Bool
+--isClosed e = fv e == Set.empty
+
+--displayProgram :: [LamExp] -> String
+--displayProgram [] = ""
+--displayProgram (l:ls) = (displayProgram ls) ++ (show l) ++ "\n"
+
+--main :: IO ()
+--main = getArgs >>= par
+--par ["-h"] = usage >> exit
+--par ["-d", fs] = do
+--  prog <- (parseFromFile program (fs))
+--  case prog of
+--    Right e1 -> case (evalStmt s e1) of
+--                          Right b1 -> case (evalStmt2 b1 g e1) of
+--                                          Right c1 -> putStrLn ("The parsed bare expressions are: " ++ "\n" ++ (show c1) ++ "\n\n" ++ "The parsed vars are: " ++ "\n" ++ (show b1)++ "\n" ++ " and the parsed program is " ++ "\n" ++ (show e1))
+--                          Left b2 -> error b2
+                   
+
+--    Left e2  -> error (show e2)
+--    where s = Map.empty
+--          g = []
+
+--par [fs] = do
+--  prog <- (parseFromFile program (fs))
+--  case prog of
+--    Right e1 -> case (evalStmt s e1) of
+--                          Right b1 -> case (evalStmt2 b1 g e1) of
+--                                          Right c1 -> putStrLn (displayProgram c1)
+--                          Left b2 -> error b2
+                   
+
+--    Left e2  -> error (show e2)
+--    where s = Map.empty
+--          g = []
+--par [] = do
+--  input <- getContents
+--  case (regularParse program input) of
+--    Right e1 -> case (evalStmt s e1) of
+--                          Right b1 -> case (evalStmt2 b1 g e1) of
+--                                          Right c1 -> putStrLn ("The parsed bare expressions are: " ++ "\n" ++ (show c1) ++ "\n\n" ++ "The parsed vars are: " ++ "\n" ++ (show b1)++ "\n" ++ " and the parsed program is " ++ "\n" ++ (show e1))
+--                          Left b2 -> error b2
+                   
+
+--    Left e2  -> error (show e2)
+--    where s = Map.empty
+--          g = []
+--par _ = errorExit
+
+--usage =  do putStrLn "interp [OPTIONS] FILE (defaults to -, for stdin)"
+--            putStrLn "  lambda calculus interpreter"
+--            putStrLn "  -c --check    Check scope"
+--            putStrLn "  -n --numeral  Convert final Church numeral to a number"
+--            putStrLn "  -? --help     Display help message]"
+--exit = exitWith ExitSuccess
+--errorExit = exitWith (ExitFailure 1)
+
+--Right plus = regularParse lexp "lambda m n. m lambda n. lambda s z. s (n s z) n"
+
+
+--test = "let zero = lambda s z. z; let succ = lambda n. lambda s z. s (n s z); let one = succ zero;"
+
+--Right testParsed = regularParse program test
+--Right testSt = (evalStmt Map.empty testParsed)
+--testSimp = "let a = lambda x . x;"
+--Right simpParsed = regularParse program testSimp
+--expr = (Exp (App (Var "succ") (App (Var "succ") (Var "zero"))))
+--expr2 = (Exp (Var "one"))
+--Right ev = evalStmt2 testSt [] expr
+--Right ev2 = evalStmt2 testSt [] expr2
