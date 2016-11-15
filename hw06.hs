@@ -1,4 +1,4 @@
---Various functions taken/adapted from https://github.com/JakeWheat/intro_to_parsing
+   --Various functions taken/adapted from https://github.com/JakeWheat/intro_to_parsing
 
 module Hw06 where
 
@@ -18,11 +18,14 @@ import System.Exit
 import System.Environment
 
 
+data Type  =
+      IntT Int
+    | BoolT Bool
+    | FuncT Type Type
+    | PairT Type Type
+    deriving (Eq)
+
 type VarName = String
-
-type Store = Map VarName LamExp
-
-
 
 data LamExp =
     Var VarName
@@ -30,16 +33,32 @@ data LamExp =
   | Lam VarName Type LamExp
   | If LamExp LamExp LamExp
   | Let VarName LamExp LamExp
-  | LetRec VarName LamExp LamExp
+  | LetRec VarName Type LamExp LamExp
   | Assign LamExp Type
   | Nat Int
-  | True
-  | False
+  | TrueL
+  | FalseL
   | Pair LamExp LamExp
-  | Unop LamExp
-  | Binop LamExp LamExp
+  | Unop Unop LamExp
+  | Binop Binop LamExp LamExp
+  deriving (Eq)
+
+data Unop =
+    Neg
+  | Not
+  | Fst
+  | Snd
   deriving (Show, Eq)
 
+data Binop =
+    Plus
+  | Minus
+  | Mult
+  | Div
+  | And
+  | Or
+  | Equals
+  deriving (Show, Eq)
 
 data Stmt =
       LetS VarName LamExp
@@ -47,23 +66,43 @@ data Stmt =
     | Seq Stmt Stmt
    deriving (Show, Eq)
 
-data Type  =
-      IntT Int
-    | BoolT Bool
-    | FuncT Type Type
-    | PairT Type Type
-    deriving (Show, Eq)
+type Store = Map VarName LamExp
 
--- instance Show LamExp where
---   show = show' 0 where
---     show' _ (Var v) = v
---     show' z (App la1 la2)
---      | z < 1 = show' 1 la1 ++ " " ++ show' 1 la2
---      | otherwise = "(" ++ show' 1 la1 ++ " " ++ show' 1 la2 ++ ")"
---     show' z (Lam x la)
---      | z < 1 = "lambda " ++ show' 1 (Var x) ++ ". " ++ show' 1 la
---      | otherwise = "(" ++ "lambda " ++ show' 1 (Var x) ++ ". " ++ show' 1 la ++ ")"
---
+instance Show LamExp where
+  show = show' 0 where
+    show' _ (Var v) = v
+    show' z (App la1 la2)
+     | z < 1 = show' 1 la1 ++ " " ++ show' 1 la2
+     | otherwise = "(" ++ show' 1 la1 ++ " " ++ show' 1 la2 ++ ")"
+    show' z (Lam x t la)
+     | z < 1 = "lambda " ++ show' 1 (Var x) ++ " : " ++ show t ++ ". " ++ show' 1 la
+     | otherwise = "(" ++ "lambda " ++ show' 1 (Var x) ++ ":" ++ show (t) ++ ". " ++ show' 1 la ++ ")"
+    show' z (If la1 la2 la3)
+     | z < 1 = "if " ++ show' 1 la1 ++ " then " ++ show' 1 la2 ++ " else " ++ show' 1 la3
+     | otherwise = "(if" ++ show' 1 la1 ++ " then " ++ show' 1 la2 ++ " else " ++ show' 1 la3 ++ ")"
+    show' z (Let v la1 la2)
+     | z < 1 = "let " ++ v ++ show' 1 la1 ++ " in " ++ show' 1 la2
+     | otherwise = "(let " ++ v ++ show' 1 la1 ++ " in " ++ show' 1 la2 ++ ")"
+    show' z (LetRec v t la1 la2)
+     | z < 1 = "let rec " ++ v ++ " : " ++ show t ++ " = " ++ show' 1 la1 ++ " in " ++ show' 1 la2
+     | otherwise = "(let rec " ++ v ++ " : " ++ show t ++ " = " ++ show' 1 la1 ++ " in " ++ show' 1 la2 ++ ")"
+    show' _ (Assign la t) = "(" ++ show' 1 la ++ show t ++ ")"
+    show' _ (Nat n) = show n
+    show' _ TrueL = "true"
+    show' _ FalseL = "false"
+    show' _ (Pair la1 la2) = "(" ++ show' 1 la1 ++ ", " ++ show' 1 la2 ++ ")"
+    show' z (Unop u la)
+     | z < 1 = show u ++ show' 1 la
+     | otherwise = "(" ++ show u ++ show' 1 la ++ ")"
+    show' z (Binop b la1 la2)
+     | z < 1 = show' 1 la1 ++ show b ++ show' 1 la2
+     | otherwise = "(" ++ show' 1 la1 ++ show b ++ show' 1 la2 ++ ")"
+
+
+
+instance Show Type where
+  show = undefined
+
 -- one = Lam "s" (Lam "z" (App (Var "s") (App (App (Lam "s" (Lam "z" (Var "z"))) (Var "s")) (Var "z"))))
 --
 -- asdf = (App (Var "s") (App (App (Lam "s" (Lam "z" (Var "z"))) (Var "s")) (Var "z")))
