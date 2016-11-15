@@ -141,6 +141,9 @@ parens p = (char '(' *> p) <* char ')'
 dot :: Parser Char
 dot = char '.'
 
+semi :: Parser Char
+semi = char ':'
+
 keywords :: [String]
 keywords = ["lambda","let"]
 
@@ -171,38 +174,40 @@ kw s = (lexeme . try) (p >>= check)
 ws :: Parser ()
 ws = void $ many $ oneOf " \n"
 
--- lexp ::Parser LamExp
--- lexp = ws *> (chainl1 (lamP <|> varP <|> (parens lexp)) (ws *> op))
---
--- varP :: Parser LamExp
--- varP =  Var <$> (ws *> var)
---
+lexp ::Parser LamExp
+lexp = ws *> (chainl1 (lamP <|> varP <|> (parens lexp)) (ws *> op))
+
+varP :: Parser LamExp
+varP =  Var <$> (ws *> var)
+
 firstChar = satisfy (\a -> isLetter a || a == '_')
 nonFirstChar = satisfy (\a -> isDigit a || isLetter a || a == '_')
 
 
-main :: IO ()
-main = putStrLn "Does nothing yet"
 
---
--- lamP :: Parser LamExp
--- lamP = try oneArg <|> try multArgs
---         where
---           oneArg = Lam <$> (ws *> ((kw "lambda") *> var <* dot)) <*> lexp
---           multArgs = Lam <$> (ws *> ((kw "lambda") *> var)) <*> lamP2
---
--- lamP2 :: Parser LamExp
--- lamP2 = try moreArgs <|> lastArg
---         where
---           lastArg = Lam <$> (var <* dot) <*> lexp
---           moreArgs = Lam <$> var <*> lamP2
---
--- op :: Parser (LamExp -> LamExp -> LamExp)
--- op =
---   do return app
---
--- app :: LamExp -> LamExp -> LamExp
--- app x y = App x y
+
+typeP :: Parser Type
+typeP = undefined
+
+lamP :: Parser LamExp
+lamP = try oneArg <|> try multArgs
+        where
+          oneArg = Lam <$> (ws *> (kw "lambda") *> var) <*> (semi *> typeP <* dot) <*> lexp
+          multArgs = Lam <$> (ws *> ((kw "lambda") *> var)) <*> (semi *> typeP) <*> lamP2
+
+lamP2 :: Parser LamExp
+lamP2 = try moreArgs <|> lastArg
+        where
+          lastArg = Lam <$> (var) <*> (semi *> typeP) <*> lexp
+          moreArgs = Lam <$> var <*> (semi *> typeP) <*> lamP2
+
+
+op :: Parser (LamExp -> LamExp -> LamExp)
+op =
+  do return app
+
+app :: LamExp -> LamExp -> LamExp
+app x y = App x y
 --
 -- sc :: Parser Char
 -- sc = ws *> (char ';') <* ws
@@ -286,7 +291,12 @@ main = putStrLn "Does nothing yet"
 --
 -- isClosed :: LamExp -> Bool
 -- isClosed e = fv e == Set.empty
---
+
+
+
+main :: IO ()
+main = putStrLn "Does nothing yet"
+
 -- main :: IO ()
 -- main = getArgs >>= par
 -- par ["-d", fs] = do
