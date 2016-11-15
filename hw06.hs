@@ -3,7 +3,7 @@
 module Hw06 where
 
 import System.Environment
-import Control.Applicative ((<*), (*>), (<*>), (<$>))
+import Control.Applicative ((<*), (*>), (<*>), (<$>),some)
 import Data.Char
 import Text.Parsec
 import Text.Parsec.String (parseFromFile)
@@ -19,8 +19,8 @@ import System.Environment
 
 
 data Type  =
-      IntT Int
-    | BoolT Bool
+      IntT
+    | BoolT
     | FuncT Type Type
     | PairT Type Type
     deriving (Eq)
@@ -99,8 +99,8 @@ instance Show LamExp where
      | otherwise = "(" ++ show' 1 la1 ++ show b ++ show' 1 la2 ++ ")"
 
 instance Show Type where
-  show (IntT i) = show i
-  show (BoolT b) = show b
+  show IntT = "int"
+  show BoolT = "bool"
   show (FuncT t1 t2) = show t1 ++ " -> " ++ show t2
   show (PairT t1 t2) = "(" ++ show t1 ++ ", " ++ show t2 ++ ")"
 
@@ -155,6 +155,7 @@ lexeme p = do
            ws
            return x
 
+
 var :: Parser String
 var = (lexeme . try) (p >>= check)
   where
@@ -171,8 +172,14 @@ kw s = (lexeme . try) (p >>= check)
                 then fail $ show x ++ ", I think you meant " ++ show s
                 else return x
 
+arrow :: Parser Char
+arrow = char '-' *> char '>'
+
 ws :: Parser ()
 ws = void $ many $ oneOf " \n"
+
+num :: Parser Int
+num = ws *> (read <$> some (satisfy isDigit))
 
 lexp ::Parser LamExp
 lexp = ws *> (chainl1 (lamP <|> varP <|> (parens lexp)) (ws *> op))
@@ -186,8 +193,21 @@ nonFirstChar = satisfy (\a -> isDigit a || isLetter a || a == '_')
 
 
 
-typeP :: Parser Type
-typeP = undefined
+typeP, primitivesP, functionP :: Parser Type
+typeP =  try functionP <|> primitivesP
+primitivesP = try ws *> (parens intTP) <|> try intTP <|> try ws *> (parens boolTP) <|> try boolTP
+      where
+         intTP =  IntT <$ (ws *> kw "int")
+         boolTP = BoolT <$ (ws *> kw "bool")
+functionP =  try ws *> (parens funcTP) <|> try funcTP <|> (ws *> parens pairTP)
+      where
+         funcTP = FuncT <$> (primitivesP <* ws <* arrow) <*> typeP
+         pairTP = PairT <$> typeP <*> (ws *> char ',' *> ws *> typeP)
+
+isTrue :: Parser Bool
+isTrue = fmap (\s -> if s == "true" then True else False) $ kw "true"
+isFalse :: Parser Bool
+isFalse = fmap (\s -> if s == "false" then False else True) $ kw "false"
 
 lamP :: Parser LamExp
 lamP = try oneArg <|> try multArgs
