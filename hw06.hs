@@ -48,7 +48,7 @@ data Unop =
   | Not
   | Fst
   | Snd
-  deriving (Show, Eq)
+  deriving (Eq)
 
 data Binop =
     Plus
@@ -58,7 +58,7 @@ data Binop =
   | And
   | Or
   | Equals
-  deriving (Show, Eq)
+  deriving (Eq)
 
 data Stmt =
       LetS VarName LamExp
@@ -98,10 +98,27 @@ instance Show LamExp where
      | z < 1 = show' 1 la1 ++ show b ++ show' 1 la2
      | otherwise = "(" ++ show' 1 la1 ++ show b ++ show' 1 la2 ++ ")"
 
-
-
 instance Show Type where
-  show = undefined
+  show (IntT i) = show i
+  show (BoolT b) = show b
+  show (FuncT t1 t2) = show t1 ++ " -> " ++ show t2
+  show (PairT t1 t2) = "(" ++ show t1 ++ ", " ++ show t2 ++ ")"
+
+
+instance Show Unop where
+  show Neg = "-"
+  show Not = "not"
+  show Fst = "fst"
+  show Snd = "snd"
+
+instance Show Binop where
+  show Plus = "+"
+  show Minus = "-"
+  show Mult = "*"
+  show Div = "/"
+  show And = "and"
+  show Or = "or"
+  show Equals = "=="
 
 -- one = Lam "s" (Lam "z" (App (Var "s") (App (App (Lam "s" (Lam "z" (Var "z"))) (Var "s")) (Var "z"))))
 --
@@ -394,10 +411,10 @@ main = putStrLn "Does nothing yet"
 --subst (Lam y e1) x e2 = if y == x then (Lam y e1) else (Lam y (subst e1 x e2))
 
 ---- Interpreter for LC
---evalLam :: Store -> LamExp -> Either error LamExp 
+--evalLam :: Store -> LamExp -> Either error LamExp
 --evalLam st v@(Var x) = Left (error ("Error: Undefined variable " ++ x))
 --evalLam st e@(Lam x la) = pure e
---evalLam st (App e1 e2) = do 
+--evalLam st (App e1 e2) = do
 --                          v1 <- evalLam st e1
 --                          v2 <- evalLam st e2
 --                          case ((evalLam st e1), (evalLam st e2)) of
@@ -410,9 +427,9 @@ main = putStrLn "Does nothing yet"
 --evalStmt :: Store -> Stmt -> Either error Store
 --evalStmt st (Let x l) = case (evalLam st (replaceVars st l)) of
 --                              Right e -> Right (Map.insert x e st)
---                              Left e2 -> Left e2 
+--                              Left e2 -> Left e2
 --evalStmt st (Exp l) = Right st
---evalStmt st (Seq s1 s2) = case (evalStmt st s1) of 
+--evalStmt st (Seq s1 s2) = case (evalStmt st s1) of
 --                                (Right e1) -> case (evalStmt e1 s2) of
 --                                                  Right k1 -> Right k1
 --                                                  Left k2 -> Left k2
@@ -422,9 +439,9 @@ main = putStrLn "Does nothing yet"
 --evalStmt2 st l (Let x a) = Right l
 --evalStmt2 st l e@(Exp z) = case (evalLam st (replaceVars st z)) of
 --                                          Right e2 -> Right (e2:l)
---                                          Left e3 -> Left e3                                         
+--                                          Left e3 -> Left e3
 
---evalStmt2 st l (Seq s1 s2) = case (evalStmt2 st l s1) of 
+--evalStmt2 st l (Seq s1 s2) = case (evalStmt2 st l s1) of
 --                                (Right e1) -> case (evalStmt2 st e1 s2) of
 --                                                  Right k1 -> Right k1
 --                                                  Left k2 -> Left k2
@@ -474,7 +491,7 @@ main = putStrLn "Does nothing yet"
 --                          Right b1 -> case (evalStmt2 b1 g e1) of
 --                                          Right c1 -> putStrLn ("The parsed bare expressions are: " ++ "\n" ++ (show c1) ++ "\n\n" ++ "The parsed vars are: " ++ "\n" ++ (show b1)++ "\n" ++ " and the parsed program is " ++ "\n" ++ (show e1))
 --                          Left b2 -> error b2
-                   
+
 
 --    Left e2  -> error (show e2)
 --    where s = Map.empty
@@ -487,7 +504,7 @@ main = putStrLn "Does nothing yet"
 --                          Right b1 -> case (evalStmt2 b1 g e1) of
 --                                          Right c1 -> putStrLn (displayProgram c1)
 --                          Left b2 -> error b2
-                   
+
 
 --    Left e2  -> error (show e2)
 --    where s = Map.empty
@@ -499,7 +516,7 @@ main = putStrLn "Does nothing yet"
 --                          Right b1 -> case (evalStmt2 b1 g e1) of
 --                                          Right c1 -> putStrLn ("The parsed bare expressions are: " ++ "\n" ++ (show c1) ++ "\n\n" ++ "The parsed vars are: " ++ "\n" ++ (show b1)++ "\n" ++ " and the parsed program is " ++ "\n" ++ (show e1))
 --                          Left b2 -> error b2
-                   
+
 
 --    Left e2  -> error (show e2)
 --    where s = Map.empty
