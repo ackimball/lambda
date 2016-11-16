@@ -145,7 +145,7 @@ col :: Parser Char
 col = ws *> char ':'
 
 keywords :: [String]
-keywords = ["lambda","let"]
+keywords = ["lambda","let","if","then","else"]
 
 isKeyword = (`elem` keywords)
 
@@ -176,10 +176,26 @@ arrow :: Parser Char
 arrow = char '-' *> char '>'
 
 ws :: Parser ()
-ws = void $ many $ oneOf " \n"
+ws = void $ many $ oneOf " \n\t\r"
 
 num :: Parser Int
 num = ws *> (read <$> some (satisfy isDigit))
+
+
+-- top level if | then  | else |  eqs
+-- eqs = add ("==" add) *
+-- add = mul ("+, -, or" mul) *
+-- mul = unop ("*, / and" unop) *
+-- unop "not" atom | "let" atom | "snd" atom | atom 
+-- atom = true | false | n | x | lambda x:t . e | (expr)
+
+  -- additive things
+  -- multipicative things (sep by add)
+  -- unary things (sep by mult)
+  -- atoms (true, false, numbers, lambda)
+
+-- add a type checker for hw6 LCs 
+-- main.hs, syntax(parser, pretty printer, syntax definitions), checker, evaluator)
 
 lexp ::Parser LamExp
 lexp = ws *> (chainl1 (try trueP <|> try lamP <|> try varP <|> try (parens lexp)) (ws *> op))
@@ -449,7 +465,7 @@ main = putStrLn "Does nothing yet"
 --subst (App e1 e2) x e3 = app (subst e1 x e3) (subst e2 x e3)
 --subst (Lam y e1) x e2 = if y == x then (Lam y e1) else (Lam y (subst e1 x e2))
 
----- Interpreter for LC
+-- Interpreter for LC
 --evalLam :: Store -> LamExp -> Either error LamExp
 --evalLam st v@(Var x) = Left (error ("Error: Undefined variable " ++ x))
 --evalLam st e@(Lam x la) = pure e
@@ -457,7 +473,7 @@ main = putStrLn "Does nothing yet"
 --                          v1 <- evalLam st e1
 --                          v2 <- evalLam st e2
 --                          case ((evalLam st e1), (evalLam st e2)) of
---                               (Right (Lam x y), Right e@(Lam k z)) -> Right (subst y x e)
+--                               (Right (Lam x y), Right e) -> Right (subst y x e)
 --                               (Right c1,Left c2) -> Left (error c2)
 --                               (Left c1, Right c2) -> Left (error c1)
 --                               (Left c1, Left c2) -> Left (error c1)
