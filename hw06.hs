@@ -141,8 +141,8 @@ parens p = (char '(' *> p) <* char ')'
 dot :: Parser Char
 dot = char '.'
 
-semi :: Parser Char
-semi = char ':'
+col :: Parser Char
+col = ws *> char ':'
 
 keywords :: [String]
 keywords = ["lambda","let"]
@@ -182,10 +182,13 @@ num :: Parser Int
 num = ws *> (read <$> some (satisfy isDigit))
 
 lexp ::Parser LamExp
-lexp = ws *> (chainl1 (lamP <|> varP <|> (parens lexp)) (ws *> op))
+lexp = ws *> (chainl1 (try trueP <|> try lamP <|> try varP <|> try (parens lexp)) (ws *> op))
 
 varP :: Parser LamExp
 varP =  Var <$> (ws *> var)
+
+ifP :: Parser LamExp
+ifP = If <$> (ws *> (kw "if") *> lexp) <*> (ws *> (kw "then") *> lexp) <*> ((ws *> kw "else") *> lexp)   
 
 firstChar = satisfy (\a -> isLetter a || a == '_')
 nonFirstChar = satisfy (\a -> isDigit a || isLetter a || a == '_')
@@ -194,7 +197,7 @@ nonFirstChar = satisfy (\a -> isDigit a || isLetter a || a == '_')
 
 
 typeP, primitivesP, functionP :: Parser Type
-typeP =  try functionP <|> primitivesP
+typeP =  try (ws *> functionP) <|> (ws *> primitivesP)
 primitivesP = try ws *> (parens intTP) <|> try intTP <|> try ws *> (parens boolTP) <|> try boolTP
       where
          intTP =  IntT <$ (ws *> kw "int")
@@ -204,6 +207,7 @@ functionP =  try ws *> (parens funcTP) <|> try funcTP <|> (ws *> parens pairTP)
          funcTP = FuncT <$> (primitivesP <* ws <* arrow) <*> typeP
          pairTP = PairT <$> typeP <*> (ws *> char ',' *> ws *> typeP)
 
+
 isTrue :: Parser Bool
 isTrue = fmap (\s -> if s == "true" then True else False) $ kw "true"
 isFalse :: Parser Bool
@@ -212,15 +216,20 @@ isFalse = fmap (\s -> if s == "false" then False else True) $ kw "false"
 lamP :: Parser LamExp
 lamP = try oneArg <|> try multArgs
         where
-          oneArg = Lam <$> (ws *> (kw "lambda") *> var) <*> (semi *> typeP <* dot) <*> lexp
-          multArgs = Lam <$> (ws *> ((kw "lambda") *> var)) <*> (semi *> typeP) <*> lamP2
+          oneArg = Lam <$> (ws *> (kw "lambda") *> var) <*> (col *> typeP <* dot) <*> lexp
+          multArgs = Lam <$> (ws *> ((kw "lambda") *> var)) <*> (col *> typeP) <*> lamP2
 
 lamP2 :: Parser LamExp
-lamP2 = try moreArgs <|> lastArg
+lamP2 = try (ws *> moreArgs) <|> (ws *> lastArg)
         where
-          lastArg = Lam <$> (var) <*> (semi *> typeP) <*> lexp
-          moreArgs = Lam <$> var <*> (semi *> typeP) <*> lamP2
+          lastArg = Lam <$> (ws *> var) <*> (col *> typeP <* dot) <*> lexp
+          moreArgs = Lam <$> (ws *> var) <*> (col *> typeP) <*> lamP2
 
+trueP :: Parser LamExp
+trueP = TrueL <$ (kw "true")
+
+falseP :: Parser LamExp
+falseP = FalseL <$ (kw "false")
 
 op :: Parser (LamExp -> LamExp -> LamExp)
 op =
