@@ -275,6 +275,22 @@ typeChecker e (App l1 l2) = do
                             if (t1 == t3) then Right t2 else (Left (error "bad type"))
 
 
+subst :: LamExp -> VarName -> LamExp -> LamExp
+subst v@(Var y) x e = if (y == x) then e else v
+subst (App e1 e2) x e3 = app (subst e1 x e3) (subst e2 x e3)
+subst (Lam y t e1) x e2 = if y == x then (Lam y t e1) else (Lam y t (subst e1 x e2))
+
+evalLam :: Store -> LamExp -> Either error LamExp
+evalLam st v@(Var x) = Left (error ("Error: Undefined variable " ++ x))
+evalLam st e@(Lam x t la) = pure e
+evalLam st (App e1 e2) = do
+                         v1 <- evalLam st e1
+                         v2 <- evalLam st e2
+                         case ((evalLam st e1), (evalLam st e2)) of
+                              (Right (Lam x t y), Right e) -> Right (subst y x e)
+                              (Right c1,Left c2) -> Left (error c2)
+                              (Left c1, Right c2) -> Left (error c1)
+                              (Left c1, Left c2) -> Left (error c1)
 
 
 
@@ -366,8 +382,120 @@ typeChecker e (App l1 l2) = do
 
 
 
+evalStmt :: Store -> Stmt -> Either error Store
+evalStmt st (LetS x l) = case (evalLam st (replaceVars st l)) of
+                             Right e -> Right (Map.insert x e st)
+                             Left e2 -> Left e2
+evalStmt st (Exp l) = Right st
+evalStmt st (Seq s1 s2) = case (evalStmt st s1) of
+                               (Right e1) -> case (evalStmt e1 s2) of
+                                                 Right k1 -> Right k1
+                                                 Left k2 -> Left k2
+                               (Left e2) -> Left e2
+
+evalStmt2 :: Store -> [LamExp] -> Stmt -> Either error [LamExp]
+evalStmt2 st l (LetS x a) = Right l
+evalStmt2 st l e@(Exp z) = case (evalLam st (replaceVars st z)) of
+                                         Right e2 -> Right (e2:l)
+                                         Left e3 -> Left e3
+
+evalStmt2 st l (Seq s1 s2) = case (evalStmt2 st l s1) of
+                               (Right e1) -> case (evalStmt2 st e1 s2) of
+                                                 Right k1 -> Right k1
+                                                 Left k2 -> Left k2
+                               (Left e2) -> Left e2
+
+getLams :: Stmt -> [LamExp] -> [LamExp]
+getLams (LetS x a) l =  l
+getLams e@(Exp z) l = z:l
+getLams (Seq s1 s2) l = (getLams s2 (getLams s1 l) )
+
+checkLams :: [LamExp] -> Either error [Type]
+checkLams = undefined
+
+evalLams :: Store -> [LamExp] -> [LamExp]
+evalLams = undefined 
+
+replaceVars :: Store -> LamExp -> LamExp
+replaceVars st (Var x) = if ((findWithDefault (Var x) x st) == (Var x)) then (Var x) else (replaceVars st (findWithDefault (Var x) x st))
+replaceVars st (Lam x t y) = Lam x t (replaceVars st y)
+replaceVars st (App x y) = App (replaceVars st x) (replaceVars st y)
+
+program :: Parser Stmt
+program = seqParser
+
+seqParser :: Parser Stmt
+seqParser = ws *> (try (Seq <$> (stmtParser) <*> seqParser) <|> try stmtParserEnd <|> try stmtParserEnd2)
+
+stmtParser :: Parser Stmt
+stmtParser = expCase <|> letCase
+         where
+            expCase = Exp <$> lexp <* sc
+            letCase = LetS <$> ((kw "let") *> var <* (char '=')) <*> lexp <* sc
+
+
+stmtParserEnd :: Parser Stmt
+stmtParserEnd = expCase <|> letCase
+         where
+            expCase = Exp <$> lexp <* eof
+            letCase = LetS <$> ((kw "let") *> var <* (char '=')) <*> lexp <* eof
+
+stmtParserEnd2 :: Parser Stmt
+stmtParserEnd2 = expCase <|> letCase
+         where
+            expCase = Exp <$> lexp <* sc <* eof
+            letCase = LetS <$> ((kw "let") *> var <* (char '=')) <*> lexp <* sc <* eof
+
+displayProgram :: [LamExp] -> String
+displayProgram [] = ""
+displayProgram (l:ls) = (displayProgram ls) ++ (show l) ++ "\n"
+
+
+-- run :: String -> String
+-- run s = do
+--     parsed <- regularParse program s
+--     store <- evalStmt Map.empty parsed
+--     expr <- evalStmt2 store 
+
+--     typed <- typeChecker Map.empty parsed
+
+
+
+
+-- 
+
+  -- store <- evalStmt Map.empty s
+  -- evaluated <- evalStmt2 store [] s
+  -- return evaluated 
+
+-- checkAll :: [LamExp] -> Either error [Type]
+-- checkAll [] = []
+-- checkAll (l:ls) = case (typeChecker Map.empty l) of
+--                     Right e1 -> Right (e1:(checkAll ls))
+--                     Left e2 -> error "bad"
+
+
+
+
 main :: IO ()
-main = putStrLn "Does nothing yet"
+main = undefined
+  -- 
+-- par [] = do
+--   input <- getContents
+--   parsed <- regularParse program input
+--   case (checkAll (run (parsed))) of
+--               Right e1 -> putStrLn (displayProgram (run (parsed)))
+--               Left e2 -> error e2
+  
+-- par _ = errorExit
+
+-- usage =  do putStrLn "interp [OPTIONS] FILE (defaults to -, for stdin)"
+--             putStrLn "  lambda calculus interpreter"
+--             putStrLn "  -c --check    Check scope"
+--             putStrLn "  -n --numeral  Convert final Church numeral to a number"
+--             putStrLn "  -? --help     Display help message]"
+-- exit = exitWith ExitSuccess
+-- errorExit = exitWith (ExitFailure 1)
 
 -- main :: IO ()
 -- main = getArgs >>= par
@@ -455,8 +583,8 @@ main = putStrLn "Does nothing yet"
 --app :: LamExp -> LamExp -> LamExp
 --app x y = App x y
 
---sc :: Parser Char
---sc = ws *> (char ';') <* ws
+sc :: Parser Char
+sc = ws *> (char ';') <* ws
 
 --nl :: Parser Char
 --nl = ws *> satisfy (=='\n')
