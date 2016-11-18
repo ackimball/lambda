@@ -41,7 +41,7 @@ data LamExp =
   | Pair LamExp LamExp
   | Unop Unop LamExp
   | Binop Binop LamExp LamExp
-  deriving (Eq)
+  deriving (Show, Eq)
 
 data Unop =
     Neg
@@ -68,35 +68,39 @@ data Stmt =
 
 type Store = Map VarName LamExp
 
-instance Show LamExp where
-  show = show' 0 where
-    show' _ (Var v) = v
-    show' z (App la1 la2)
-     | z < 1 = show' 1 la1 ++ " " ++ show' 1 la2
-     | otherwise = "(" ++ show' 1 la1 ++ " " ++ show' 1 la2 ++ ")"
-    show' z (Lam x t la)
-     | z < 1 = "lambda " ++ show' 1 (Var x) ++ " : " ++ show t ++ ". " ++ show' 1 la
-     | otherwise = "(" ++ "lambda " ++ show' 1 (Var x) ++ ":" ++ show (t) ++ ". " ++ show' 1 la ++ ")"
-    show' z (If la1 la2 la3)
-     | z < 1 = "if " ++ show' 1 la1 ++ " then " ++ show' 1 la2 ++ " else " ++ show' 1 la3
-     | otherwise = "(if" ++ show' 1 la1 ++ " then " ++ show' 1 la2 ++ " else " ++ show' 1 la3 ++ ")"
-    show' z (Let v la1 la2)
-     | z < 1 = "let " ++ v ++ show' 1 la1 ++ " in " ++ show' 1 la2
-     | otherwise = "(let " ++ v ++ show' 1 la1 ++ " in " ++ show' 1 la2 ++ ")"
-    show' z (LetRec v t la1 la2)
-     | z < 1 = "let rec " ++ v ++ " : " ++ show t ++ " = " ++ show' 1 la1 ++ " in " ++ show' 1 la2
-     | otherwise = "(let rec " ++ v ++ " : " ++ show t ++ " = " ++ show' 1 la1 ++ " in " ++ show' 1 la2 ++ ")"
-    show' _ (Assign la t) = "(" ++ show' 1 la ++ show t ++ ")"
-    show' _ (Nat n) = show n
-    show' _ TrueL = "true"
-    show' _ FalseL = "false"
-    show' _ (Pair la1 la2) = "(" ++ show' 1 la1 ++ ", " ++ show' 1 la2 ++ ")"
-    show' z (Unop u la)
-     | z < 1 = show u ++ show' 1 la
-     | otherwise = "(" ++ show u ++ show' 1 la ++ ")"
-    show' z (Binop b la1 la2)
-     | z < 1 = show' 1 la1 ++ show b ++ show' 1 la2
-     | otherwise = "(" ++ show' 1 la1 ++ show b ++ show' 1 la2 ++ ")"
+type Env = Map VarName Type
+
+--type Err = Either String 
+
+-- instance Show LamExp where
+--   show = show' 0 where
+--     show' _ (Var v) = v
+--     show' z (App la1 la2)
+--      | z < 1 = show' 1 la1 ++ " " ++ show' 1 la2
+--      | otherwise = "(" ++ show' 1 la1 ++ " " ++ show' 1 la2 ++ ")"
+--     show' z (Lam x t la)
+--      | z < 1 = "lambda " ++ show' 1 (Var x) ++ " : " ++ show t ++ ". " ++ show' 1 la
+--      | otherwise = "(" ++ "lambda " ++ show' 1 (Var x) ++ ":" ++ show (t) ++ ". " ++ show' 1 la ++ ")"
+--     show' z (If la1 la2 la3)
+--      | z < 1 = "if " ++ show' 1 la1 ++ " then " ++ show' 1 la2 ++ " else " ++ show' 1 la3
+--      | otherwise = "(if" ++ show' 1 la1 ++ " then " ++ show' 1 la2 ++ " else " ++ show' 1 la3 ++ ")"
+--     show' z (Let v la1 la2)
+--      | z < 1 = "let " ++ v ++ show' 1 la1 ++ " in " ++ show' 1 la2
+--      | otherwise = "(let " ++ v ++ show' 1 la1 ++ " in " ++ show' 1 la2 ++ ")"
+--     show' z (LetRec v t la1 la2)
+--      | z < 1 = "let rec " ++ v ++ " : " ++ show t ++ " = " ++ show' 1 la1 ++ " in " ++ show' 1 la2
+--      | otherwise = "(let rec " ++ v ++ " : " ++ show t ++ " = " ++ show' 1 la1 ++ " in " ++ show' 1 la2 ++ ")"
+--     show' _ (Assign la t) = "(" ++ show' 1 la ++ show t ++ ")"
+--     show' _ (Nat n) = show n
+--     show' _ TrueL = "true"
+--     show' _ FalseL = "false"
+--     show' _ (Pair la1 la2) = "(" ++ show' 1 la1 ++ ", " ++ show' 1 la2 ++ ")"
+--     show' z (Unop u la)
+--      | z < 1 = show u ++ show' 1 la
+--      | otherwise = "(" ++ show u ++ show' 1 la ++ ")"
+--     show' z (Binop b la1 la2)
+--      | z < 1 = show' 1 la1 ++ show b ++ show' 1 la2
+--      | otherwise = "(" ++ show' 1 la1 ++ show b ++ show' 1 la2 ++ ")"
 
 instance Show Type where
   show IntT = "int"
@@ -253,6 +257,29 @@ op =
 
 app :: LamExp -> LamExp -> LamExp
 app x y = App x y
+
+
+Right x = regularParse lexp "lambda y:int.y lambda x:bool.x"
+en = Map.empty
+
+
+
+typeChecker :: Env -> LamExp -> Either error Type 
+typeChecker e (Var v) = Right (findWithDefault (IntT) v e)
+typeChecker e (Lam x t la) = do
+                             t2 <- typeChecker (Map.insert x t e) la
+                             Right (FuncT t t2)
+typeChecker e (App l1 l2) = do 
+                            (FuncT t1 t2) <- typeChecker e l1
+                            t3 <- typeChecker e l2
+                            if (t1 == t3) then Right t2 else (Left (error "bad type"))
+
+
+
+
+
+
+
 --
 -- sc :: Parser Char
 -- sc = ws *> (char ';') <* ws
