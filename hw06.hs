@@ -149,7 +149,7 @@ col :: Parser Char
 col = ws *> char ':'
 
 keywords :: [String]
-keywords = ["lambda","let","if","then","else", "and", "or", "not", "fst", "snd"]
+keywords = ["lambda","let","if","then","else", "and", "or", "not", "fst", "snd", "in"]
 
 isKeyword = (`elem` keywords)
 
@@ -201,14 +201,6 @@ num = ws *> (read <$> some (satisfy isDigit))
 -- add a type checker for hw6 LCs
 -- main.hs, syntax(parser, pretty printer, syntax definitions), checker, evaluator)
 
-lexp ::Parser LamExp
-lexp = ws *> (chainl1 (try trueP <|> try lamP <|> try varP <|> try (parens lexp)) (ws *> op))
-
-varP :: Parser LamExp
-varP =  Var <$> (ws *> var)
-
-ifP :: Parser LamExp
-ifP = If <$> (ws *> (kw "if") *> lexp) <*> (ws *> (kw "then") *> lexp) <*> ((ws *> kw "else") *> lexp)
 
 firstChar = satisfy (\a -> isLetter a || a == '_')
 nonFirstChar = satisfy (\a -> isDigit a || isLetter a || a == '_')
@@ -241,14 +233,7 @@ negP = Neg <$ char '-'
 notP = Not <$ kw "not"
 fstP = Fst <$ kw "fst"
 sndP = Snd <$ kw "snd"
--- instance Show Binop where
---   show Plus = "+"
---   show Minus = "-"
---   show Mult = "*"
---   show Div = "/"
---   show And = "and"
---   show Or = "or"
---   show Equals = "=="
+
 
 plusP, minusP, multP, divP, andP, orP, equalsP, binopP :: Parser Binop
 binopP = (ws *> (plusP <|> minusP <|> multP <|> divP <|> andP <|> orP <|> equalsP))
@@ -261,6 +246,17 @@ orP = Or <$ kw "or"
 equalsP = Equals <$ char '=' <* char '='
 
 
+lexp ::Parser LamExp
+lexp = ws *> (chainl1 (try trueP <|> try lamP <|> try varP <|> try ifP <|> try letP <|> (parens lexp)) (ws *> op))
+
+varP :: Parser LamExp
+varP =  Var <$> (ws *> var)
+
+ifP :: Parser LamExp
+ifP = If <$> (ws *> (kw "if") *> lexp) <*> (ws *> (kw "then") *> lexp) <*> ((ws *> kw "else") *> lexp)
+
+letP :: Parser LamExp
+letP = Let <$> (ws *> kw "let" *> ws *> var) <*> (ws *> (char '=') *> ws *> lexp) <*> (ws *> kw "in" *> ws *> lexp)
 
 lamP :: Parser LamExp
 lamP = try oneArg <|> try multArgs
