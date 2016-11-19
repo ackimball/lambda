@@ -70,7 +70,7 @@ type Store = Map VarName LamExp
 
 type Env = Map VarName Type
 
---type Err = Either String 
+--type Err = Either String
 
 -- instance Show LamExp where
 --   show = show' 0 where
@@ -149,7 +149,7 @@ col :: Parser Char
 col = ws *> char ':'
 
 keywords :: [String]
-keywords = ["lambda","let","if","then","else"]
+keywords = ["lambda","let","if","then","else", "and", "or", "not", "fst", "snd"]
 
 isKeyword = (`elem` keywords)
 
@@ -190,7 +190,7 @@ num = ws *> (read <$> some (satisfy isDigit))
 -- eqs = add ("==" add) *
 -- add = mul ("+, -, or" mul) *
 -- mul = unop ("*, / and" unop) *
--- unop "not" atom | "let" atom | "snd" atom | atom 
+-- unop "not" atom | "let" atom | "snd" atom | atom
 -- atom = true | false | n | x | lambda x:t . e | (expr)
 
   -- additive things
@@ -198,7 +198,7 @@ num = ws *> (read <$> some (satisfy isDigit))
   -- unary things (sep by mult)
   -- atoms (true, false, numbers, lambda)
 
--- add a type checker for hw6 LCs 
+-- add a type checker for hw6 LCs
 -- main.hs, syntax(parser, pretty printer, syntax definitions), checker, evaluator)
 
 lexp ::Parser LamExp
@@ -208,7 +208,7 @@ varP :: Parser LamExp
 varP =  Var <$> (ws *> var)
 
 ifP :: Parser LamExp
-ifP = If <$> (ws *> (kw "if") *> lexp) <*> (ws *> (kw "then") *> lexp) <*> ((ws *> kw "else") *> lexp)   
+ifP = If <$> (ws *> (kw "if") *> lexp) <*> (ws *> (kw "then") *> lexp) <*> ((ws *> kw "else") *> lexp)
 
 firstChar = satisfy (\a -> isLetter a || a == '_')
 nonFirstChar = satisfy (\a -> isDigit a || isLetter a || a == '_')
@@ -232,6 +232,35 @@ isTrue :: Parser Bool
 isTrue = fmap (\s -> if s == "true" then True else False) $ kw "true"
 isFalse :: Parser Bool
 isFalse = fmap (\s -> if s == "false" then False else True) $ kw "false"
+
+
+
+negP, notP, fstP, sndP, unopP :: Parser Unop
+unopP = (ws *> (negP <|> notP <|> fstP <|> sndP))
+negP = Neg <$ char '-'
+notP = Not <$ kw "not"
+fstP = Fst <$ kw "fst"
+sndP = Snd <$ kw "snd"
+-- instance Show Binop where
+--   show Plus = "+"
+--   show Minus = "-"
+--   show Mult = "*"
+--   show Div = "/"
+--   show And = "and"
+--   show Or = "or"
+--   show Equals = "=="
+
+plusP, minusP, multP, divP, andP, orP, equalsP, binopP :: Parser Binop
+binopP = (ws *> (plusP <|> minusP <|> multP <|> divP <|> andP <|> orP <|> equalsP))
+plusP = Plus <$ char '+'
+minusP = Minus <$ char '-'
+multP = Mult <$ char '*'
+divP = Div <$ char '/'
+andP = And <$ kw "and"
+orP = Or <$ kw "or"
+equalsP = Equals <$ char '=' <* char '='
+
+
 
 lamP :: Parser LamExp
 lamP = try oneArg <|> try multArgs
@@ -264,12 +293,12 @@ en = Map.empty
 
 
 
-typeChecker :: Env -> LamExp -> Either error Type 
+typeChecker :: Env -> LamExp -> Either error Type
 typeChecker e (Var v) = Right (findWithDefault (IntT) v e)
 typeChecker e (Lam x t la) = do
                              t2 <- typeChecker (Map.insert x t e) la
                              Right (FuncT t t2)
-typeChecker e (App l1 l2) = do 
+typeChecker e (App l1 l2) = do
                             (FuncT t1 t2) <- typeChecker e l1
                             t3 <- typeChecker e l2
                             if (t1 == t3) then Right t2 else (Left (error "bad type"))
@@ -414,7 +443,7 @@ checkLams :: [LamExp] -> Either error [Type]
 checkLams = undefined
 
 evalLams :: Store -> [LamExp] -> [LamExp]
-evalLams = undefined 
+evalLams = undefined
 
 replaceVars :: Store -> LamExp -> LamExp
 replaceVars st (Var x) = if ((findWithDefault (Var x) x st) == (Var x)) then (Var x) else (replaceVars st (findWithDefault (Var x) x st))
@@ -455,18 +484,18 @@ displayProgram (l:ls) = (displayProgram ls) ++ (show l) ++ "\n"
 -- run s = do
 --     parsed <- regularParse program s
 --     store <- evalStmt Map.empty parsed
---     expr <- evalStmt2 store 
+--     expr <- evalStmt2 store
 
 --     typed <- typeChecker Map.empty parsed
 
 
 
 
--- 
+--
 
   -- store <- evalStmt Map.empty s
   -- evaluated <- evalStmt2 store [] s
-  -- return evaluated 
+  -- return evaluated
 
 -- checkAll :: [LamExp] -> Either error [Type]
 -- checkAll [] = []
@@ -479,14 +508,14 @@ displayProgram (l:ls) = (displayProgram ls) ++ (show l) ++ "\n"
 
 main :: IO ()
 main = undefined
-  -- 
+  --
 -- par [] = do
 --   input <- getContents
 --   parsed <- regularParse program input
 --   case (checkAll (run (parsed))) of
 --               Right e1 -> putStrLn (displayProgram (run (parsed)))
 --               Left e2 -> error e2
-  
+
 -- par _ = errorExit
 
 -- usage =  do putStrLn "interp [OPTIONS] FILE (defaults to -, for stdin)"
