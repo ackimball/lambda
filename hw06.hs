@@ -1,4 +1,4 @@
-   --Various functions taken/adapted from https://github.com/JakeWheat/intro_to_parsing
+--Various functions taken/adapted from https://github.com/JakeWheat/intro_to_parsing
 
 module Hw06 where
 
@@ -294,10 +294,15 @@ typeChecker e (Var v) = Right (findWithDefault (IntT) v e)
 typeChecker e (Lam x t la) = do
                              t2 <- typeChecker (Map.insert x t e) la
                              Right (FuncT t t2)
-typeChecker e (App l1 l2) = do
-                            (FuncT t1 t2) <- typeChecker e l1
+typeChecker e (App l1 l2) = do 
+                            (FuncT t1 t2) <- isFunc
                             t3 <- typeChecker e l2
-                            if (t1 == t3) then Right t2 else (Left (error "bad type"))
+                            if (t1 == t3) then Right t2 else (Left (error "argument has wrong type"))
+                            where isFunc = case (typeChecker e l1) of
+                                            Right e@(FuncT t1 t2) -> Right e
+                                            Right z@_ -> Left ((error ("non function application - applying to type: " ++ (show z))))
+                                            Left e2 -> Left e2
+
 
 
 subst :: LamExp -> VarName -> LamExp -> LamExp
@@ -436,10 +441,19 @@ getLams e@(Exp z) l = z:l
 getLams (Seq s1 s2) l = (getLams s2 (getLams s1 l) )
 
 checkLams :: [LamExp] -> Either error [Type]
-checkLams = undefined
+checkLams [] = Right []
+checkLams (l:ls) = do
+                    t1 <- typeChecker Map.empty l
+                    t <- checkLams ls 
+                    Right (t1:t)
 
-evalLams :: Store -> [LamExp] -> [LamExp]
-evalLams = undefined
+
+evalLams :: Store -> [LamExp] -> Either error [LamExp]
+evalLams st [] = Right []
+evalLams st (l:ls) = do
+                    e1 <- evalLam st l
+                    e2 <- evalLams st ls
+                    Right (e1:e2)
 
 replaceVars :: Store -> LamExp -> LamExp
 replaceVars st (Var x) = if ((findWithDefault (Var x) x st) == (Var x)) then (Var x) else (replaceVars st (findWithDefault (Var x) x st))
@@ -476,15 +490,13 @@ displayProgram [] = ""
 displayProgram (l:ls) = (displayProgram ls) ++ (show l) ++ "\n"
 
 
--- run :: String -> String
--- run s = do
---     parsed <- regularParse program s
---     store <- evalStmt Map.empty parsed
---     expr <- evalStmt2 store
-
---     typed <- typeChecker Map.empty parsed
-
-
+run :: Stmt -> Either error String
+run s = do
+    --parsed <- regularParse program s
+    store <- evalStmt Map.empty s
+    types <- checkLams (map (replaceVars store) (getLams s []))
+    evaled <- evalLams store (map (replaceVars store) (getLams s []))
+    Right (displayProgram evaled)
 
 
 --
@@ -503,24 +515,31 @@ displayProgram (l:ls) = (displayProgram ls) ++ (show l) ++ "\n"
 
 
 main :: IO ()
-main = undefined
-  --
--- par [] = do
---   input <- getContents
---   parsed <- regularParse program input
---   case (checkAll (run (parsed))) of
---               Right e1 -> putStrLn (displayProgram (run (parsed)))
---               Left e2 -> error e2
+main = getArgs >>= par 
+par [] = do
+   input <- getContents
+   case (regularParse program input) of
+                      Right e1 -> case (run e1) of
+                                    Right p1 -> putStrLn p1
+                                    Left p2 -> error p2
+                      Left e2 -> error (show e2::String)
+par [fs] = do
+   prog <- (parseFromFile program (fs))
+   case prog of
+                      Right e1 -> case (run e1) of
+                                    Right p1 -> putStrLn p1
+                                    Left p2 -> error p2
+                      Left e2 -> error (show e2::String)
 
--- par _ = errorExit
+par _ = errorExit
 
--- usage =  do putStrLn "interp [OPTIONS] FILE (defaults to -, for stdin)"
---             putStrLn "  lambda calculus interpreter"
---             putStrLn "  -c --check    Check scope"
---             putStrLn "  -n --numeral  Convert final Church numeral to a number"
---             putStrLn "  -? --help     Display help message]"
--- exit = exitWith ExitSuccess
--- errorExit = exitWith (ExitFailure 1)
+usage =  do putStrLn "interp [OPTIONS] FILE (defaults to -, for stdin)"
+            putStrLn "  lambda calculus interpreter"
+            putStrLn "  -c --check    Check scope"
+            putStrLn "  -n --numeral  Convert final Church numeral to a number"
+            putStrLn "  -? --help     Display help message]"
+exit = exitWith ExitSuccess
+errorExit = exitWith (ExitFailure 1)
 
 -- main :: IO ()
 -- main = getArgs >>= par
