@@ -149,7 +149,7 @@ col :: Parser Char
 col = ws *> char ':'
 
 keywords :: [String]
-keywords = ["lambda","let","if","then","else", "and", "or", "not", "fst", "snd", "in"]
+keywords = ["lambda","let","if","then","else", "and", "or", "not", "fst", "snd", "in","true", "false"]
 
 isKeyword = (`elem` keywords)
 
@@ -246,28 +246,38 @@ orP = Or <$ kw "or"
 equalsP = Equals <$ char '=' <* char '='
 
 
-lexp ::Parser LamExp
-lexp = ws *> (chainl1 (try trueP <|> try lamP <|> try varP <|> try ifP <|> try letP <|> (parens lexp)) (ws *> op))
+lexp :: Parser LamExp
+lexp = unop
+
+
+unop :: Parser LamExp
+unop = (Unop <$> unopP <*> atom) <|> atom
+
+
+atom ::Parser LamExp
+atom = ws *> (chainl1 (try trueP <|> try falseP <|> try lamP <|> try varP <|> (parens atom)) (ws *> op))
+
+
 
 varP :: Parser LamExp
 varP =  Var <$> (ws *> var)
 
 ifP :: Parser LamExp
-ifP = If <$> (ws *> (kw "if") *> lexp) <*> (ws *> (kw "then") *> lexp) <*> ((ws *> kw "else") *> lexp)
+ifP = If <$> (ws *> (kw "if") *> atom) <*> (ws *> (kw "then") *> atom) <*> ((ws *> kw "else") *> atom)
 
 letP :: Parser LamExp
-letP = Let <$> (ws *> kw "let" *> ws *> var) <*> (ws *> (char '=') *> ws *> lexp) <*> (ws *> kw "in" *> ws *> lexp)
+letP = Let <$> (ws *> kw "let" *> ws *> var) <*> (ws *> (char '=') *> ws *> atom) <*> (ws *> kw "in" *> ws *> atom)
 
 lamP :: Parser LamExp
 lamP = try oneArg <|> try multArgs
         where
-          oneArg = Lam <$> (ws *> (kw "lambda") *> var) <*> (col *> typeP <* dot) <*> lexp
+          oneArg = Lam <$> (ws *> (kw "lambda") *> var) <*> (col *> typeP <* dot) <*> atom
           multArgs = Lam <$> (ws *> ((kw "lambda") *> var)) <*> (col *> typeP) <*> lamP2
 
 lamP2 :: Parser LamExp
 lamP2 = try (ws *> moreArgs) <|> (ws *> lastArg)
         where
-          lastArg = Lam <$> (ws *> var) <*> (col *> typeP <* dot) <*> lexp
+          lastArg = Lam <$> (ws *> var) <*> (col *> typeP <* dot) <*> atom
           moreArgs = Lam <$> (ws *> var) <*> (col *> typeP) <*> lamP2
 
 trueP :: Parser LamExp
@@ -284,7 +294,7 @@ app :: LamExp -> LamExp -> LamExp
 app x y = App x y
 
 
-Right x = regularParse lexp "lambda y:int.y lambda x:bool.x"
+Right x = regularParse atom "lambda y:int.y lambda x:bool.x"
 en = Map.empty
 
 
@@ -303,7 +313,24 @@ typeChecker e (App l1 l2) = do
                                             Right z@_ -> Left ((error ("non function application - applying to type: " ++ (show z))))
                                             Left e2 -> Left e2
 
-
+typeChecker e (TrueL) = Right BoolT 
+typeChecker e (FalseL) = Right BoolT 
+typeChecker e (Unop Not x) = do
+                            t1 <- typeChecker e x
+                            if (t1 == BoolT) then Right t1 else (Left (error "Not is applied to a non-boolean"))
+typeChecker e (Unop Neg x) = do
+                            t1 <- typeChecker e x
+                            if (t1 == IntT) then Right t1 else (Left (error "Neg is applied to a non-int"))
+typeChecker e (Unop Fst x) = do
+                            t1 <- typeChecker e x
+                            case t1 of 
+                               (PairT x y) -> Right t1
+                               _ -> Left (error "Fst is applied to a non-pair")
+typeChecker e (Unop Snd x) = do
+                            t1 <- typeChecker e x
+                            case t1 of 
+                               (PairT x y) -> Right t1
+                               _ -> Left (error "2nd is applied to a non-pair")
 
 subst :: LamExp -> VarName -> LamExp -> LamExp
 subst v@(Var y) x e = if (y == x) then e else v
@@ -321,6 +348,10 @@ evalLam st (App e1 e2) = do
                               (Right c1,Left c2) -> Left (error c2)
                               (Left c1, Right c2) -> Left (error c1)
                               (Left c1, Left c2) -> Left (error c1)
+
+evalLam st (TrueL) = Right TrueL
+evalLam st (FalseL) = Right FalseL
+
 
 
 
@@ -342,21 +373,21 @@ evalLam st (App e1 e2) = do
 -- stmtParser :: Parser Stmt
 -- stmtParser = expCase <|> letCase
 --           where
---              expCase = Exp <$> lexp <* sc
---              letCase = Let <$> ((kw "let") *> var <* (char '=')) <*> lexp <* sc
+--              expCase = Exp <$> atom <* sc
+--              letCase = Let <$> ((kw "let") *> var <* (char '=')) <*> atom <* sc
 --
 --
 -- stmtParserEnd :: Parser Stmt
 -- stmtParserEnd = expCase <|> letCase
 --           where
---              expCase = Exp <$> lexp <* ws <* eof
---              letCase = Let <$> ((kw "let") *> var <* (char '=')) <*> lexp <* ws <* eof
+--              expCase = Exp <$> atom <* ws <* eof
+--              letCase = Let <$> ((kw "let") *> var <* (char '=')) <*> atom <* ws <* eof
 --
 -- stmtParserEnd2 :: Parser Stmt
 -- stmtParserEnd2 = expCase <|> letCase
 --           where
---              expCase = Exp <$> lexp <* sc <* eof
---              letCase = Let <$> ((kw "let") *> var <* (char '=')) <*> lexp <* sc <* eof
+--              expCase = Exp <$> atom <* sc <* eof
+--              letCase = Let <$> ((kw "let") *> var <* (char '=')) <*> atom <* sc <* eof
 --
 -- --Substitution
 -- subst :: LamExp -> VarName -> LamExp -> LamExp
@@ -459,6 +490,12 @@ replaceVars :: Store -> LamExp -> LamExp
 replaceVars st (Var x) = if ((findWithDefault (Var x) x st) == (Var x)) then (Var x) else (replaceVars st (findWithDefault (Var x) x st))
 replaceVars st (Lam x t y) = Lam x t (replaceVars st y)
 replaceVars st (App x y) = App (replaceVars st x) (replaceVars st y)
+replaceVars st (TrueL) = TrueL 
+replaceVars st (FalseL) = FalseL 
+replaceVars st (Unop Not x) = Unop Not (replaceVars st x)
+replaceVars st (Unop Neg x) = Unop Neg (replaceVars st x)
+replaceVars st (Unop Fst x) = Unop Fst (replaceVars st x)
+replaceVars st (Unop Snd x) = Unop Snd (replaceVars st x)
 
 program :: Parser Stmt
 program = seqParser
@@ -591,7 +628,7 @@ errorExit = exitWith (ExitFailure 1)
 -- exit = exitWith ExitSuccess
 -- errorExit = exitWith (ExitFailure 1)
 --
--- Right plus = regularParse lexp "lambda m n. m lambda n. lambda s z. s (n s z) n"
+-- Right plus = regularParse atom "lambda m n. m lambda n. lambda s z. s (n s z) n"
 --
 --
 -- test = "let zero = lambda s z. z; let succ = lambda n. lambda s z. s (n s z); succ zero"
@@ -611,13 +648,13 @@ errorExit = exitWith (ExitFailure 1)
 --lamP :: Parser LamExp
 --lamP = try oneArg <|> try multArgs
 --        where
---          oneArg = Lam <$> (ws *> ((kw "lambda") *> var <* dot)) <*> lexp
+--          oneArg = Lam <$> (ws *> ((kw "lambda") *> var <* dot)) <*> atom
 --          multArgs = Lam <$> (ws *> ((kw "lambda") *> var)) <*> lamP2
 
 --lamP2 :: Parser LamExp
 --lamP2 = try moreArgs <|> lastArg
 --        where
---          lastArg = Lam <$> (var <* dot) <*> lexp
+--          lastArg = Lam <$> (var <* dot) <*> atom
 --          moreArgs = Lam <$> var <*> lamP2
 
 --op :: Parser (LamExp -> LamExp -> LamExp)
@@ -642,21 +679,21 @@ sc = ws *> (char ';') <* ws
 --stmtParser :: Parser Stmt
 --stmtParser = expCase <|> letCase
 --          where
---             expCase = Exp <$> lexp <* sc
---             letCase = Let <$> ((kw "let") *> var <* (char '=')) <*> lexp <* sc
+--             expCase = Exp <$> atom <* sc
+--             letCase = Let <$> ((kw "let") *> var <* (char '=')) <*> atom <* sc
 
 
 --stmtParserEnd :: Parser Stmt
 --stmtParserEnd = expCase <|> letCase
 --          where
---             expCase = Exp <$> lexp <* eof
---             letCase = Let <$> ((kw "let") *> var <* (char '=')) <*> lexp <* eof
+--             expCase = Exp <$> atom <* eof
+--             letCase = Let <$> ((kw "let") *> var <* (char '=')) <*> atom <* eof
 
 --stmtParserEnd2 :: Parser Stmt
 --stmtParserEnd2 = expCase <|> letCase
 --          where
---             expCase = Exp <$> lexp <* sc <* eof
---             letCase = Let <$> ((kw "let") *> var <* (char '=')) <*> lexp <* sc <* eof
+--             expCase = Exp <$> atom <* sc <* eof
+--             letCase = Let <$> ((kw "let") *> var <* (char '=')) <*> atom <* sc <* eof
 
 ----Substitution
 --subst :: LamExp -> VarName -> LamExp -> LamExp
@@ -785,7 +822,7 @@ sc = ws *> (char ';') <* ws
 --exit = exitWith ExitSuccess
 --errorExit = exitWith (ExitFailure 1)
 
---Right plus = regularParse lexp "lambda m n. m lambda n. lambda s z. s (n s z) n"
+--Right plus = regularParse atom "lambda m n. m lambda n. lambda s z. s (n s z) n"
 
 
 --test = "let zero = lambda s z. z; let succ = lambda n. lambda s z. s (n s z); let one = succ zero;"
