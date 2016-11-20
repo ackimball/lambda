@@ -1,7 +1,4 @@
-let a = b;
-let zero = lambda s z. z;
-let succ = lambda n. lambda s z. s (n s z);
-succ zero;
-succ (succ zero);
-succ (succ (succ zero));
-a
+let x = 1*5;
+let t = true;
+let f = false;
+x == 5;
