@@ -149,7 +149,7 @@ col :: Parser Char
 col = ws *> char ':'
 
 keywords :: [String]
-keywords = ["lambda","let","if","then","else", "and", "or", "not", "fst", "snd", "in","true", "false"]
+keywords = ["lambda","let","rec","if","then","else", "and", "or", "not", "fst", "snd", "in","true", "false"]
 
 isKeyword = (`elem` keywords)
 
@@ -258,7 +258,7 @@ unop = try (Unop <$> unopP <*> atom) <|> try atom
 
 
 atom ::Parser LamExp
-atom = ws *> (chainl1 (try trueP <|> try falseP <|> try lamP <|> try varP <|> try natP <|> (parens atom)) (ws *> op))
+atom = ws *> (chainl1 (try trueP <|> try falseP <|> try lamP <|> try varP <|> try natP <|> try pairP <|> (parens atom)) (ws *> op))
 
 natP :: Parser LamExp
 natP = Nat <$> num
@@ -272,6 +272,10 @@ ifP = If <$> (ws *> (kw "if") *> atom) <*> (ws *> (kw "then") *> atom) <*> ((ws 
 letP :: Parser LamExp
 letP = Let <$> (ws *> kw "let" *> ws *> var) <*> (ws *> (char '=') *> ws *> atom) <*> (ws *> kw "in" *> ws *> atom)
 
+
+letRecP :: Parser LamExp
+letRecP  = LetRec <$> (ws *> kw "let" *> ws *> kw "rec" *> var) <*> (ws *> char ':' *> typeP) <*>
+                  (ws *> char '=' *> lexp) <*> (ws *> kw "in" *> lexp)
 lamP :: Parser LamExp
 lamP = try oneArg <|> try multArgs
         where
@@ -289,6 +293,9 @@ trueP = TrueL <$ (kw "true")
 
 falseP :: Parser LamExp
 falseP = FalseL <$ (kw "false")
+
+pairP :: Parser LamExp
+pairP = Pair <$> (ws *> char '(' *> ws *> lexp <* ws <* char ',') <*> (ws *> lexp <* ws <* char ')')
 
 op :: Parser (LamExp -> LamExp -> LamExp)
 op =
@@ -309,7 +316,7 @@ typeChecker e (Var v) = Right (findWithDefault (IntT) v e)
 typeChecker e (Lam x t la) = do
                              t2 <- typeChecker (Map.insert x t e) la
                              Right (FuncT t t2)
-typeChecker e (App l1 l2) = do 
+typeChecker e (App l1 l2) = do
                             (FuncT t1 t2) <- isFunc
                             t3 <- typeChecker e l2
                             if (t1 == t3) then Right t2 else (Left (error "argument has wrong type"))
@@ -318,8 +325,8 @@ typeChecker e (App l1 l2) = do
                                             Right z@_ -> Left ((error ("non function application - applying to type: " ++ (show z))))
                                             Left e2 -> Left e2
 
-typeChecker e (TrueL) = Right BoolT 
-typeChecker e (FalseL) = Right BoolT 
+typeChecker e (TrueL) = Right BoolT
+typeChecker e (FalseL) = Right BoolT
 typeChecker e (Unop Not x) = do
                             t1 <- typeChecker e x
                             if (t1 == BoolT) then Right t1 else (Left (error "Not is applied to a non-boolean"))
@@ -328,12 +335,12 @@ typeChecker e (Unop Neg x) = do
                             if (t1 == IntT) then Right t1 else (Left (error "Neg is applied to a non-int"))
 typeChecker e (Unop Fst x) = do
                             t1 <- typeChecker e x
-                            case t1 of 
+                            case t1 of
                                (PairT x y) -> Right t1
                                _ -> Left (error "Fst is applied to a non-pair")
 typeChecker e (Unop Snd x) = do
                             t1 <- typeChecker e x
-                            case t1 of 
+                            case t1 of
                                (PairT x y) -> Right t1
                                _ -> Left (error "2nd is applied to a non-pair")
 typeChecker e (Binop x Mult y) = do
@@ -345,28 +352,28 @@ typeChecker e (Binop x Mult y) = do
 typeChecker e (Binop x Div y) = do
                             t1 <- typeChecker e x
                             t2 <- typeChecker e y
-                            case (t1,t2) of 
+                            case (t1,t2) of
                                 (IntT,IntT) -> Right IntT
                                 _ -> Left (error "Div is applied to non-ints")
 typeChecker e (Binop x And y) = do
                             t1 <- typeChecker e x
                             t2 <- typeChecker e y
-                            case (t1,t2) of 
+                            case (t1,t2) of
                                 (BoolT,BoolT) -> Right BoolT
-                                _ -> Left (error "And is applied to non-bools")       
+                                _ -> Left (error "And is applied to non-bools")
 typeChecker e (Binop x Or y) = do
                             t1 <- typeChecker e x
                             t2 <- typeChecker e y
-                            case (t1,t2) of 
+                            case (t1,t2) of
                                 (BoolT,BoolT) -> Right BoolT
-                                _ -> Left (error "Or is applied to non-bools")   
+                                _ -> Left (error "Or is applied to non-bools")
 typeChecker e (Binop x Equals y) = do
                             t1 <- typeChecker e x
                             t2 <- typeChecker e y
-                            case (t1,t2) of 
+                            case (t1,t2) of
                                 (BoolT,BoolT) -> Right BoolT
                                 (IntT, IntT) -> Right IntT
-                                _ -> Left (error "Equals is applied to functions or there's a type mismatch")                                                       
+                                _ -> Left (error "Equals is applied to functions or there's a type mismatch")
 
 subst :: LamExp -> VarName -> LamExp -> LamExp
 subst v@(Var y) x e = if (y == x) then e else v
@@ -389,37 +396,37 @@ evalLam st (App e1 e2) = do
 evalLam st (TrueL) = Right TrueL
 evalLam st (FalseL) = Right FalseL
 evalLam st (Unop Not TrueL) = Right FalseL
-evalLam st (Unop Not FalseL) = Right TrueL 
+evalLam st (Unop Not FalseL) = Right TrueL
 evalLam st (Unop Neg x) = undefined --don't have ints yet
 evalLam st (Unop Fst (Pair x _)) = Right x
 evalLam st (Unop Snd (Pair _ y)) = Right y
-evalLam st (Binop x Mult y) = do 
+evalLam st (Binop x Mult y) = do
                               Nat int1 <- evalLam st x
-                              Nat int2 <- evalLam st y 
+                              Nat int2 <- evalLam st y
                               Right (Nat (int1 * int2))
-evalLam st (Binop x Div y) = do 
+evalLam st (Binop x Div y) = do
                               Nat int1 <- evalLam st x
-                              Nat int2 <- evalLam st y 
+                              Nat int2 <- evalLam st y
                               Right (Nat (div int1 int2))
-evalLam st (Binop x And y) = do 
+evalLam st (Binop x And y) = do
                               bool1 <- evalLam st x
-                              bool2 <- evalLam st y 
+                              bool2 <- evalLam st y
                               case (bool1, bool2) of
                                 (TrueL, TrueL) -> Right TrueL
                                 (TrueL, FalseL) -> Right FalseL
                                 (FalseL, TrueL) -> Right FalseL
                                 (FalseL, FalseL) -> Right FalseL
-evalLam st (Binop x Or y) = do 
+evalLam st (Binop x Or y) = do
                               bool1 <- evalLam st x
-                              bool2 <- evalLam st y 
+                              bool2 <- evalLam st y
                               case (bool1, bool2) of
                                 (TrueL, TrueL) -> Right FalseL
                                 (TrueL, FalseL) -> Right TrueL
                                 (FalseL, TrueL) -> Right TrueL
-                                (FalseL, FalseL) -> Right FalseL 
-evalLam st (Binop x Equals y) = do 
+                                (FalseL, FalseL) -> Right FalseL
+evalLam st (Binop x Equals y) = do
                               t1 <- evalLam st x
-                              t2 <- evalLam st y 
+                              t2 <- evalLam st y
                               case (t1, t2) of
                                 (TrueL, TrueL) -> Right TrueL
                                 (TrueL, FalseL) -> Right FalseL
@@ -557,7 +564,7 @@ checkLams :: [LamExp] -> Either error [Type]
 checkLams [] = Right []
 checkLams (l:ls) = do
                     t1 <- typeChecker Map.empty l
-                    t <- checkLams ls 
+                    t <- checkLams ls
                     Right (t1:t)
 
 
@@ -572,8 +579,8 @@ replaceVars :: Store -> LamExp -> LamExp
 replaceVars st (Var x) = if ((findWithDefault (Var x) x st) == (Var x)) then (Var x) else (replaceVars st (findWithDefault (Var x) x st))
 replaceVars st (Lam x t y) = Lam x t (replaceVars st y)
 replaceVars st (App x y) = App (replaceVars st x) (replaceVars st y)
-replaceVars st (TrueL) = TrueL 
-replaceVars st (FalseL) = FalseL 
+replaceVars st (TrueL) = TrueL
+replaceVars st (FalseL) = FalseL
 replaceVars st (Nat x) = Nat x
 replaceVars st (Unop Not x) = Unop Not (replaceVars st x)
 replaceVars st (Unop Neg x) = Unop Neg (replaceVars st x)
@@ -641,7 +648,7 @@ run s = do
 
 
 main :: IO ()
-main = getArgs >>= par 
+main = getArgs >>= par
 par [] = do
    input <- getContents
    case (regularParse program input) of
