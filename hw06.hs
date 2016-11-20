@@ -236,7 +236,7 @@ sndP = Snd <$ kw "snd"
 
 
 plusP, minusP, multP, divP, andP, orP, equalsP, binopP :: Parser Binop
-binopP = (ws *> (multP <|> divP <|> andP <|> orP <|> equalsP))
+binopP = (ws *>(plusP <|> minusP <|> multP <|> divP <|> andP <|> orP <|> equalsP))
 plusP = Plus <$ char '+'
 minusP = Minus <$ char '-'
 multP = Mult <$ (ws *> (char '*'))
@@ -247,10 +247,10 @@ equalsP = Equals <$ char '=' <* char '='
 
 
 lexp :: Parser LamExp
-lexp = mul
+lexp = mul --ws *> (chainl1 mul (ws *> op))
 
 mul :: Parser LamExp
-mul = try (Binop <$> unop <*> (ws *> binopP) <*> unop) <|> try unop
+mul = try (Binop <$> unop <*> (ws *> binopP) <*> (mul <|> unop)) <|> try unop
 
 
 unop :: Parser LamExp
@@ -258,7 +258,7 @@ unop = try (Unop <$> unopP <*> atom) <|> try atom
 
 
 atom ::Parser LamExp
-atom = ws *> (chainl1 (try trueP <|> try falseP <|> try lamP <|> try varP <|> try natP <|> try pairP <|> (parens atom)) (ws *> op))
+atom = ws *> (chainl1 (trueP <|>falseP <|> lamP <|> varP <|> natP <|> pairP <|> (parens atom)) (ws *> op))
 
 natP :: Parser LamExp
 natP = Nat <$> num
