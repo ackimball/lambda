@@ -447,7 +447,7 @@ typeChecker e (Binop x Equals y) = do
                             t2 <- typeChecker e y
                             case (t1,t2) of
                                 (BoolT,BoolT) -> Right BoolT
-                                (IntT, IntT) -> Right IntT
+                                (IntT, IntT) -> Right BoolT
                                 (_,FuncT x y) -> Left (error "Equals is applied to a function")
                                 (FuncT x y,_) -> Left (error "Equals is applied to a function")
                                 _ -> Left (error "Equals is applied to functions or there's a type mismatch")
@@ -464,6 +464,17 @@ typeChecker e (Binop x Minus y) = do
                                (IntT,IntT) -> Right IntT
                                _ -> Left (error "Minus is applied to non-ints")
 
+
+typeChecker e (If l1 l2 l3) = do
+                            t1 <- typeChecker e l1
+                            t2 <- typeChecker e l2
+                            t3 <- typeChecker e l3
+                            if (t1 == BoolT && t2 == t3) then Right t3 else Left (error ("Bad type in If statement" ++ (show t1) ++ (show t2) ++ (show t3)))
+
+Right test = regularParse lexp "lambda x:int . if x == 0 then true else false"
+t = typeChecker Map.empty test
+
+
 subst :: LamExp -> VarName -> LamExp -> LamExp
 subst v@(Var y) x e = if (y == x) then e else v
 subst v@(Nat y) x e = Nat y
@@ -477,6 +488,7 @@ subst (Binop e1 Or e2) x e3 = Binop (subst e1 x e3) Or (subst e2 x e3)
 subst (Unop Neg e1) x e3 = Unop Neg (subst e1 x e3)
 subst (Unop Fst e1) x e3 = Unop Fst (subst e1 x e3)
 subst (Unop Snd e1) x e3 = Unop Snd (subst e1 x e3)
+subst (If z1 z2 z3) x e3 = If (subst z1 x e3) (subst z2 x e3) (subst z3 x e3) 
 
 evalLam :: Store -> LamExp -> Either error LamExp
 evalLam st (Nat x) = Right (Nat x)
@@ -559,6 +571,14 @@ evalLam st (Binop x Minus y) = do
                               Nat int1 <- evalLam st x
                               Nat int2 <- evalLam st y
                               Right (Nat (int1 - int2))
+
+evalLam st (If e1 e2 e3) = do 
+                              v1 <- evalLam st e1
+                              if (v1 == TrueL) then do b1 <- evalLam st e2
+                                                       Right b1
+                                                else do b2 <- evalLam st e3 
+                                                        Right b2 
+
 
 
 
