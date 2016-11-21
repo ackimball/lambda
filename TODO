@@ -1,4 +1,11 @@
-- fix parens
-- fix substitution
-- fix addition and subtraction
-- add let, let rec, if
+parser changes
+chainl at each level, but not atom
+parens only at atom level
+
+
+substitution
+
+
+
+add let, let rec, if
+
