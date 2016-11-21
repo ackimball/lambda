@@ -247,12 +247,12 @@ equalsP = Equals <$ char '=' <* char '='
 
 
 lexp :: Parser LamExp
-lexp = try eqs <|> try (parens eqs)
+lexp = try eqs
 
 -- <|> try (parens eqs)  --ws *> (chainl1 mul (ws *> op))
 
 eqs :: Parser LamExp
-eqs = (try (Binop <$> (ws *> add )<*> (ws *> equalsP) <*> (try eqs <|> try add))) <|> try add <|> try (parens add)
+eqs = (try (Binop <$> (ws *> add )<*> (ws *> equalsP) <*> (try eqs <|> try add))) <|> try add
 
 -- <|> (parens eqs)
 
@@ -264,16 +264,16 @@ mulOp :: Parser Binop
 mulOp = (ws *>(multP <|> divP <|> andP))
 
 mul :: Parser LamExp
-mul = try (Binop <$> (ws *> unop) <*> (ws *> mulOp) <*> (mul <|> unop)) <|> try unop <|> try (parens unop)
+mul = try (Binop <$> (ws *> unop) <*> (ws *> mulOp) <*> (mul <|> unop)) <|> try unop
 
 -- <|> (parens mul)
 
 unop :: Parser LamExp
-unop = try (Unop <$> unopP <*> atom) <|> try atom <|> try (parens atom)
+unop = try (Unop <$> unopP <*> atom) <|> try atom
 
 
 atom ::Parser LamExp
-atom = ws *> (chainl1 ((try trueP) <|> (try falseP) <|> (try lamP) <|> (try varP) <|> (try natP) <|> (try pairP) <|> try (parens atom)) (ws *> op ))
+atom = ws *> ((try trueP) <|> (try falseP) <|> (try lamP) <|> (try varP) <|> (try natP) <|> (try pairP) <|> try (parens lexp))
 
 natP :: Parser LamExp
 natP = Nat <$> num
@@ -412,10 +412,10 @@ typeChecker e (Binop x Or y) = do
                                 (BoolT,BoolT) -> Right BoolT
                                 _ -> Left (error "Or is applied to non-bools")
 typeChecker e (Binop (Pair a b) Equals (Pair c d)) = do
-                            ta <- typeChecker e a 
+                            ta <- typeChecker e a
                             tc <- typeChecker e c
                             tb <- typeChecker e b
-                            td <- typeChecker e d 
+                            td <- typeChecker e d
                             if (ta == tc && tb == td) then Right IntT else Left (error "Mismatched types in pair")
 typeChecker e (Binop x Equals y) = do
                             t1 <- typeChecker e x
@@ -425,7 +425,7 @@ typeChecker e (Binop x Equals y) = do
                                 (IntT, IntT) -> Right IntT
                                 (_,FuncT x y) -> Left (error "Equals is applied to a function")
                                 (FuncT x y,_) -> Left (error "Equals is applied to a function")
-                                _ -> Left (error "Equals is applied to functions or there's a type mismatch")                               
+                                _ -> Left (error "Equals is applied to functions or there's a type mismatch")
 typeChecker e (Binop x Plus y) = do
                             t1 <- typeChecker e x
                             t2 <- typeChecker e y
@@ -437,7 +437,7 @@ typeChecker e (Binop x Minus y) = do
                             t2 <- typeChecker e y
                             case (t1,t2) of
                                (IntT,IntT) -> Right IntT
-                               _ -> Left (error "Minus is applied to non-ints")                               
+                               _ -> Left (error "Minus is applied to non-ints")
 
 subst :: LamExp -> VarName -> LamExp -> LamExp
 subst v@(Var y) x e = if (y == x) then e else v
@@ -512,7 +512,7 @@ evalLam st (Binop x Equals y) = do
                                                         (Pair e3 e4) <- evalLam st (Pair c d)
                                                         if (e1 == e3 && e2 == e4) then Right TrueL else Right FalseL
                                 (_,_) -> Left (error "type mismatch in equals in evalLam")
--- evalLam st (Binop (Var x) Plus (Var y)) = Right (Binop (Var x) Plus (Var y))       
+-- evalLam st (Binop (Var x) Plus (Var y)) = Right (Binop (Var x) Plus (Var y))
 
 evalLam st (Binop x@_ Plus y@_) = do
                               Nat int1 <- evalLam st x
