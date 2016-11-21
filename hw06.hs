@@ -247,18 +247,33 @@ equalsP = Equals <$ char '=' <* char '='
 
 
 lexp :: Parser LamExp
-lexp = mul --ws *> (chainl1 mul (ws *> op))
+lexp = try eqs <|> try (parens eqs)
+
+-- <|> try (parens eqs)  --ws *> (chainl1 mul (ws *> op))
+
+eqs :: Parser LamExp
+eqs = (try (Binop <$> (ws *> add )<*> (ws *> equalsP) <*> (try eqs <|> try add))) <|> try add <|> try (parens add)
+
+-- <|> (parens eqs)
+
+addOp = (ws *>(plusP <|> minusP <|> orP))
+
+add = ws *> (chainl1 (try mul <|> try (parens mul)) (try addOP <|> try minusOP <|> try orOP))
+
+mulOp :: Parser Binop
+mulOp = (ws *>(multP <|> divP <|> andP))
 
 mul :: Parser LamExp
-mul = try (Binop <$> unop <*> (ws *> binopP) <*> (mul <|> unop)) <|> try unop
+mul = try (Binop <$> (ws *> unop) <*> (ws *> mulOp) <*> (mul <|> unop)) <|> try unop <|> try (parens unop)
 
+-- <|> (parens mul)
 
 unop :: Parser LamExp
-unop = try (Unop <$> unopP <*> atom) <|> try atom
+unop = try (Unop <$> unopP <*> atom) <|> try atom <|> try (parens atom)
 
 
 atom ::Parser LamExp
-atom = ws *> (chainl1 (trueP <|>falseP <|> lamP <|> varP <|> natP <|> pairP <|> (parens atom)) (ws *> op))
+atom = ws *> (chainl1 ((try trueP) <|> (try falseP) <|> (try lamP) <|> (try varP) <|> (try natP) <|> (try pairP) <|> try (parens atom)) (ws *> op ))
 
 natP :: Parser LamExp
 natP = Nat <$> num
@@ -279,13 +294,13 @@ letRecP  = LetRec <$> (ws *> kw "let" *> ws *> kw "rec" *> var) <*> (ws *> char 
 lamP :: Parser LamExp
 lamP = try oneArg <|> try multArgs
         where
-          oneArg = Lam <$> (ws *> (kw "lambda") *> var) <*> (col *> typeP <* dot) <*> atom
+          oneArg = Lam <$> (ws *> (kw "lambda") *> var) <*> (col *> typeP <* dot) <*> (try lexp <|> try (parens lexp))
           multArgs = Lam <$> (ws *> ((kw "lambda") *> var)) <*> (col *> typeP) <*> lamP2
 
 lamP2 :: Parser LamExp
 lamP2 = try (ws *> moreArgs) <|> (ws *> lastArg)
         where
-          lastArg = Lam <$> (ws *> var) <*> (col *> typeP <* dot) <*> atom
+          lastArg = Lam <$> (ws *> var) <*> (col *> typeP <* dot) <*> lexp
           moreArgs = Lam <$> (ws *> var) <*> (col *> typeP) <*> lamP2
 
 trueP :: Parser LamExp
@@ -301,9 +316,35 @@ op :: Parser (LamExp -> LamExp -> LamExp)
 op =
   do return app
 
+addOP = operator '+' plusL
+
+
+minusOP = operator '-' minusL
+
+orOP = operator2 "or" orL
+
+
 app :: LamExp -> LamExp -> LamExp
 app x y = App x y
 
+plusL :: LamExp -> LamExp -> LamExp
+plusL x y = Binop x Plus y
+
+minusL :: LamExp -> LamExp -> LamExp
+minusL x y = Binop x Minus y
+
+orL :: LamExp -> LamExp -> LamExp
+orL x y = Binop x Or y
+
+operator :: Char -> (LamExp -> LamExp -> LamExp) -> Parser (LamExp -> LamExp -> LamExp)
+operator c op = do
+          spaces >> char c >> spaces
+          return op
+
+operator2 :: String -> (LamExp -> LamExp -> LamExp) -> Parser (LamExp -> LamExp -> LamExp)
+operator2 c op = do
+          spaces >> kw c >> spaces
+          return op
 
 Right x = regularParse atom "lambda y:int.y lambda x:bool.x"
 en = Map.empty
@@ -324,7 +365,10 @@ typeChecker e (App l1 l2) = do
                                             Right e@(FuncT t1 t2) -> Right e
                                             Right z@_ -> Left ((error ("non function application - applying to type: " ++ (show z))))
                                             Left e2 -> Left e2
-
+typeChecker e (Pair a b) = do
+                           t1 <- typeChecker e a
+                           t2 <- typeChecker e b
+                           Right (PairT t1 t2)
 typeChecker e (TrueL) = Right BoolT
 typeChecker e (FalseL) = Right BoolT
 typeChecker e (Unop Not x) = do
@@ -367,17 +411,39 @@ typeChecker e (Binop x Or y) = do
                             case (t1,t2) of
                                 (BoolT,BoolT) -> Right BoolT
                                 _ -> Left (error "Or is applied to non-bools")
+typeChecker e (Binop (Pair a b) Equals (Pair c d)) = do
+                            ta <- typeChecker e a 
+                            tc <- typeChecker e c
+                            tb <- typeChecker e b
+                            td <- typeChecker e d 
+                            if (ta == tc && tb == td) then Right IntT else Left (error "Mismatched types in pair")
 typeChecker e (Binop x Equals y) = do
                             t1 <- typeChecker e x
                             t2 <- typeChecker e y
                             case (t1,t2) of
                                 (BoolT,BoolT) -> Right BoolT
                                 (IntT, IntT) -> Right IntT
-                                _ -> Left (error "Equals is applied to functions or there's a type mismatch")
+                                (_,FuncT x y) -> Left (error "Equals is applied to a function")
+                                (FuncT x y,_) -> Left (error "Equals is applied to a function")
+                                _ -> Left (error "Equals is applied to functions or there's a type mismatch")                               
+typeChecker e (Binop x Plus y) = do
+                            t1 <- typeChecker e x
+                            t2 <- typeChecker e y
+                            case (t1,t2) of
+                               (IntT,IntT) -> Right IntT
+                               _ -> Left (error "Add is applied to non-ints")
+typeChecker e (Binop x Minus y) = do
+                            t1 <- typeChecker e x
+                            t2 <- typeChecker e y
+                            case (t1,t2) of
+                               (IntT,IntT) -> Right IntT
+                               _ -> Left (error "Minus is applied to non-ints")                               
 
 subst :: LamExp -> VarName -> LamExp -> LamExp
 subst v@(Var y) x e = if (y == x) then e else v
 subst (App e1 e2) x e3 = app (subst e1 x e3) (subst e2 x e3)
+-- subst (Binop e1 Plus e2) x e3 = app (subst e1 x e3) (subst e2 x e3)
+
 subst (Lam y t e1) x e2 = if y == x then (Lam y t e1) else (Lam y t (subst e1 x e2))
 
 evalLam :: Store -> LamExp -> Either error LamExp
@@ -392,12 +458,17 @@ evalLam st (App e1 e2) = do
                               (Right c1,Left c2) -> Left (error c2)
                               (Left c1, Right c2) -> Left (error c1)
                               (Left c1, Left c2) -> Left (error c1)
-
+evalLam st (Pair a b) = do
+                        e1 <- evalLam st a
+                        e2 <- evalLam st b
+                        Right (Pair e1 e2)
 evalLam st (TrueL) = Right TrueL
 evalLam st (FalseL) = Right FalseL
 evalLam st (Unop Not TrueL) = Right FalseL
 evalLam st (Unop Not FalseL) = Right TrueL
-evalLam st (Unop Neg x) = undefined --don't have ints yet
+evalLam st (Unop Neg x) = do
+                          Nat i <- evalLam st x
+                          Right (Nat (-1 * i))
 evalLam st (Unop Fst (Pair x _)) = Right x
 evalLam st (Unop Snd (Pair _ y)) = Right y
 evalLam st (Binop x Mult y) = do
@@ -420,7 +491,7 @@ evalLam st (Binop x Or y) = do
                               bool1 <- evalLam st x
                               bool2 <- evalLam st y
                               case (bool1, bool2) of
-                                (TrueL, TrueL) -> Right FalseL
+                                (TrueL, TrueL) -> Right TrueL
                                 (TrueL, FalseL) -> Right TrueL
                                 (FalseL, TrueL) -> Right TrueL
                                 (FalseL, FalseL) -> Right FalseL
@@ -433,9 +504,22 @@ evalLam st (Binop x Equals y) = do
                                 (FalseL, TrueL) -> Right FalseL
                                 (FalseL, FalseL) -> Right TrueL
                                 (Nat x, Nat y) -> if (x==y) then Right TrueL else Right FalseL
-                                (_,_) -> Left (error "type mismatch")
+                                (Pair a b, Pair c d) -> do
+                                                        (Pair e1 e2) <- evalLam st (Pair a b)
+                                                        (Pair e3 e4) <- evalLam st (Pair c d)
+                                                        if (e1 == e3 && e2 == e4) then Right TrueL else Right FalseL
+                                (_,_) -> Left (error "type mismatch in equals in evalLam")
+-- evalLam st (Binop (Var x) Plus (Var y)) = Right (Binop (Var x) Plus (Var y))       
 
+evalLam st (Binop x@_ Plus y@_) = do
+                              Nat int1 <- evalLam st x
+                              Nat int2 <- evalLam st y
+                              Right (Nat (int1 + int2))
 
+evalLam st (Binop x Minus y) = do
+                              Nat int1 <- evalLam st x
+                              Nat int2 <- evalLam st y
+                              Right (Nat (int1 - int2))
 
 
 
@@ -597,7 +681,7 @@ program :: Parser Stmt
 program = seqParser
 
 seqParser :: Parser Stmt
-seqParser = ws *> (try (Seq <$> (stmtParser) <*> seqParser) <|> try stmtParserEnd <|> try stmtParserEnd2)
+seqParser = ws *> (try (Seq <$> (stmtParser) <*> seqParser) <|> try stmtParserEnd) -- <|> try stmtParserEnd2)
 
 stmtParser :: Parser Stmt
 stmtParser = expCase <|> letCase
@@ -606,14 +690,14 @@ stmtParser = expCase <|> letCase
             letCase = LetS <$> ((kw "let") *> var <* (char '=')) <*> lexp <* sc
 
 
+-- stmtParserEnd :: Parser Stmt
+-- stmtParserEnd = expCase <|> letCase
+--          where
+--             expCase = Exp <$> lexp <* eof
+--             letCase = LetS <$> ((kw "let") *> var <* (char '=')) <*> lexp <* eof
+
 stmtParserEnd :: Parser Stmt
 stmtParserEnd = expCase <|> letCase
-         where
-            expCase = Exp <$> lexp <* eof
-            letCase = LetS <$> ((kw "let") *> var <* (char '=')) <*> lexp <* eof
-
-stmtParserEnd2 :: Parser Stmt
-stmtParserEnd2 = expCase <|> letCase
          where
             expCase = Exp <$> lexp <* sc <* eof
             letCase = LetS <$> ((kw "let") *> var <* (char '=')) <*> lexp <* sc <* eof
