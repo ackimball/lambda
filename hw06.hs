@@ -442,9 +442,11 @@ typeChecker e (Binop x Minus y) = do
 subst :: LamExp -> VarName -> LamExp -> LamExp
 subst v@(Var y) x e = if (y == x) then e else v
 subst (App e1 e2) x e3 = app (subst e1 x e3) (subst e2 x e3)
--- subst (Binop e1 Plus e2) x e3 = app (subst e1 x e3) (subst e2 x e3)
-
-subst (Lam y t e1) x e2 = if y == x then (Lam y t e1) else (Lam y t (subst e1 x e2))
+subst (Binop e1 Mult e2) x e3 = Binop (subst e1 x e3) Mult (subst e2 x e3)
+subst (Binop e1 Plus e2) x e3 = Binop (subst e1 x e3) Plus (subst e2 x e3)
+subst (Binop e1 And e2) x e3 = Binop (subst e1 x e3) And (subst e2 x e3)
+subst (Binop e1 Or e2) x e3 = Binop (subst e1 x e3) Or (subst e2 x e3)
+subst (Unop Neg e1) x e3 = Unop Neg (subst e1 x e3)
 
 evalLam :: Store -> LamExp -> Either error LamExp
 evalLam st (Nat x) = Right (Nat x)
@@ -454,7 +456,8 @@ evalLam st (App e1 e2) = do
                          v1 <- evalLam st e1
                          v2 <- evalLam st e2
                          case ((evalLam st e1), (evalLam st e2)) of
-                              (Right (Lam x t y), Right e) -> Right (subst y x e)
+                              (Right (Lam x t y), Right e) -> do r <- (evalLam st (subst y x e))
+                                                                 Right r
                               (Right c1,Left c2) -> Left (error c2)
                               (Left c1, Right c2) -> Left (error c1)
                               (Left c1, Left c2) -> Left (error c1)
