@@ -247,29 +247,28 @@ equalsP = Equals <$ char '=' <* char '='
 
 
 lexp :: Parser LamExp
-lexp = try eqs
+lexp = (try eqs) <|> (try ifP) <|> (try letP) <|> (try letRecP)
 
 -- <|> try (parens eqs)  --ws *> (chainl1 mul (ws *> op))
 
 eqs :: Parser LamExp
-eqs = (try (Binop <$> (ws *> add )<*> (ws *> equalsP) <*> (try eqs <|> try add))) <|> try add
+eqs = ws *> chainl1 (try add) (try eqOP)
 
 -- <|> (parens eqs)
 
 addOp = (ws *>(plusP <|> minusP <|> orP))
 
-add = ws *> (chainl1 (try mul <|> try (parens mul)) (try addOP <|> try minusOP <|> try orOP))
+add = ws *> (chainl1 (try mul) (try addOP <|> try minusOP <|> try orOP))
 
 mulOp :: Parser Binop
 mulOp = (ws *>(multP <|> divP <|> andP))
 
 mul :: Parser LamExp
-mul = try (Binop <$> (ws *> unop) <*> (ws *> mulOp) <*> (mul <|> unop)) <|> try unop
+mul = ws *> (chainl1 (try unop) (multOP <|> divOP <|> andOP))
 
--- <|> (parens mul)
 
 unop :: Parser LamExp
-unop = try (Unop <$> unopP <*> atom) <|> try atom
+unop = ws *> (chainl1 (try (Unop <$> unopP <*> (atom <|> unop)) <|> try atom) (op))
 
 
 atom ::Parser LamExp
@@ -282,10 +281,10 @@ varP :: Parser LamExp
 varP =  Var <$> (ws *> var)
 
 ifP :: Parser LamExp
-ifP = If <$> (ws *> (kw "if") *> atom) <*> (ws *> (kw "then") *> atom) <*> ((ws *> kw "else") *> atom)
+ifP = If <$> (ws *> (kw "if") *> lexp) <*> (ws *> (kw "then") *> lexp) <*> ((ws *> kw "else") *> lexp)
 
 letP :: Parser LamExp
-letP = Let <$> (ws *> kw "let" *> ws *> var) <*> (ws *> (char '=') *> ws *> atom) <*> (ws *> kw "in" *> ws *> atom)
+letP = Let <$> (ws *> kw "let" *> ws *> var) <*> (ws *> (char '=') *> ws *> lexp) <*> (ws *> kw "in" *> ws *> lexp)
 
 
 letRecP :: Parser LamExp
@@ -323,6 +322,14 @@ minusOP = operator '-' minusL
 
 orOP = operator2 "or" orL
 
+multOP = operator '*' multL
+
+divOP = operator '/' divL
+
+andOP = operator2 "and" andL
+
+eqOP = operator3 '=' '=' eqL
+
 
 app :: LamExp -> LamExp -> LamExp
 app x y = App x y
@@ -333,8 +340,21 @@ plusL x y = Binop x Plus y
 minusL :: LamExp -> LamExp -> LamExp
 minusL x y = Binop x Minus y
 
+eqL :: LamExp -> LamExp -> LamExp
+eqL x y = Binop x Equals y
+
+
 orL :: LamExp -> LamExp -> LamExp
 orL x y = Binop x Or y
+
+multL :: LamExp -> LamExp -> LamExp
+multL x y = Binop x Mult y
+
+divL :: LamExp -> LamExp -> LamExp
+divL x y = Binop x Div y
+
+andL :: LamExp -> LamExp -> LamExp
+andL x y = Binop x And y
 
 operator :: Char -> (LamExp -> LamExp -> LamExp) -> Parser (LamExp -> LamExp -> LamExp)
 operator c op = do
@@ -344,6 +364,11 @@ operator c op = do
 operator2 :: String -> (LamExp -> LamExp -> LamExp) -> Parser (LamExp -> LamExp -> LamExp)
 operator2 c op = do
           spaces >> kw c >> spaces
+          return op
+
+operator3 :: Char -> Char -> (LamExp -> LamExp -> LamExp) -> Parser (LamExp -> LamExp -> LamExp)
+operator3 c1 c2 op = do
+          spaces >> char c1 >> char c2 >> spaces
           return op
 
 Right x = regularParse atom "lambda y:int.y lambda x:bool.x"
@@ -441,12 +466,17 @@ typeChecker e (Binop x Minus y) = do
 
 subst :: LamExp -> VarName -> LamExp -> LamExp
 subst v@(Var y) x e = if (y == x) then e else v
+subst v@(Nat y) x e = Nat y
 subst (App e1 e2) x e3 = app (subst e1 x e3) (subst e2 x e3)
 subst (Binop e1 Mult e2) x e3 = Binop (subst e1 x e3) Mult (subst e2 x e3)
+subst (Binop e1 Mult e2) x e3 = Binop (subst e1 x e3) Mult (subst e2 x e3)
+subst (Binop e1 Div e2) x e3 = Binop (subst e1 x e3) Div (subst e2 x e3)
 subst (Binop e1 Plus e2) x e3 = Binop (subst e1 x e3) Plus (subst e2 x e3)
 subst (Binop e1 And e2) x e3 = Binop (subst e1 x e3) And (subst e2 x e3)
 subst (Binop e1 Or e2) x e3 = Binop (subst e1 x e3) Or (subst e2 x e3)
 subst (Unop Neg e1) x e3 = Unop Neg (subst e1 x e3)
+subst (Unop Fst e1) x e3 = Unop Fst (subst e1 x e3)
+subst (Unop Snd e1) x e3 = Unop Snd (subst e1 x e3)
 
 evalLam :: Store -> LamExp -> Either error LamExp
 evalLam st (Nat x) = Right (Nat x)
@@ -469,6 +499,12 @@ evalLam st (TrueL) = Right TrueL
 evalLam st (FalseL) = Right FalseL
 evalLam st (Unop Not TrueL) = Right FalseL
 evalLam st (Unop Not FalseL) = Right TrueL
+evalLam st (Unop Not x) = do v1 <- evalLam st x
+                             case v1 of
+                                TrueL -> Right FalseL
+                                FalseL -> Right TrueL
+                                _ -> Left (error "Not applied to a non-boolean")
+
 evalLam st (Unop Neg x) = do
                           Nat i <- evalLam st x
                           Right (Nat (-1 * i))
@@ -684,7 +720,7 @@ program :: Parser Stmt
 program = seqParser
 
 seqParser :: Parser Stmt
-seqParser = ws *> (try (Seq <$> (stmtParser) <*> seqParser) <|> try stmtParserEnd) -- <|> try stmtParserEnd2)
+seqParser = ws *> (try (Seq <$> (stmtParser) <*> seqParser) <|> try stmtParserEnd <|> try stmtParserEnd2) -- <|> try stmtParserEnd2)
 
 stmtParser :: Parser Stmt
 stmtParser = expCase <|> letCase
@@ -692,15 +728,14 @@ stmtParser = expCase <|> letCase
             expCase = Exp <$> lexp <* sc
             letCase = LetS <$> ((kw "let") *> var <* (char '=')) <*> lexp <* sc
 
-
--- stmtParserEnd :: Parser Stmt
--- stmtParserEnd = expCase <|> letCase
---          where
---             expCase = Exp <$> lexp <* eof
---             letCase = LetS <$> ((kw "let") *> var <* (char '=')) <*> lexp <* eof
-
 stmtParserEnd :: Parser Stmt
 stmtParserEnd = expCase <|> letCase
+         where
+            expCase = Exp <$> lexp <* eof
+            letCase = LetS <$> ((kw "let") *> var <* (char '=')) <*> lexp <* eof
+
+stmtParserEnd2 :: Parser Stmt
+stmtParserEnd2 = expCase <|> letCase
          where
             expCase = Exp <$> lexp <* sc <* eof
             letCase = LetS <$> ((kw "let") *> var <* (char '=')) <*> lexp <* sc <* eof
