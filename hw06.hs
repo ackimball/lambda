@@ -289,8 +289,8 @@ letP = Let <$> (ws *> kw "let" *> ws *> var) <*> (ws *> (char '=') *> ws *> lexp
 
 test4 = regularParse lexp "let rec toZero:int->int = lambda n:int. if n == 0 then 0 else toZero (n+1) in toZero 5"
 test5 = regularParse lexp "lambda n:int. if n == 0 then 0 else toZero (n+-1)"
-test6 = regularParse lexp "let rec fun:int->int = lambda n:int. n + 2 in fun 6"
-t6 = typeChecker test6
+Right test6 = regularParse lexp "let rec fun:int->int = lambda n:int. n + 2 in fun 6"
+Right (t6,_) = typeChecker Map.empty test6
 
 letRecP :: Parser LamExp
 letRecP  = LetRec <$> (ws *> kw "let" *> ws *> kw "rec" *> var) <*> (ws *> char ':' *> typeP) <*>
