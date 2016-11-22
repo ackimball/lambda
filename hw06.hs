@@ -568,6 +568,8 @@ evalLam st (Binop x And y) = do
                                 (TrueL, FalseL) -> Right FalseL
                                 (FalseL, TrueL) -> Right FalseL
                                 (FalseL, FalseL) -> Right FalseL
+                                (_,_) -> Left (error "You were unsafe!")
+
 evalLam st (Binop x Or y) = do
                               bool1 <- evalLam st x
                               bool2 <- evalLam st y
@@ -576,6 +578,8 @@ evalLam st (Binop x Or y) = do
                                 (TrueL, FalseL) -> Right TrueL
                                 (FalseL, TrueL) -> Right TrueL
                                 (FalseL, FalseL) -> Right FalseL
+                                _ -> Left (error "You were unsafe!")
+
 evalLam st (Binop x Equals y) = do
                               t1 <- evalLam st x
                               t2 <- evalLam st y
@@ -590,16 +594,16 @@ evalLam st (Binop x Equals y) = do
                                                         (Pair e3 e4) <- evalLam st (Pair c d)
                                                         if (e1 == e3 && e2 == e4) then Right TrueL else Right FalseL
                                 (_,_) -> Left (error "type mismatch in equals in evalLam")
--- evalLam st (Binop (Var x) Plus (Var y)) = Right (Binop (Var x) Plus (Var y))
-
 evalLam st (Binop x@_ Plus y@_) = do
                               Nat int1 <- evalLam st x
                               Nat int2 <- evalLam st y
+                              _ <- Left (error "You were unsafe!")
                               Right (Nat (int1 + int2))
 
 evalLam st (Binop x Minus y) = do
                               Nat int1 <- evalLam st x
                               Nat int2 <- evalLam st y
+                              _ <- Left (error "You were unsafe!")
                               Right (Nat (int1 - int2))
 
 evalLam st (If e1 e2 e3) = do
@@ -616,6 +620,8 @@ evalLam st (LetRec f t v1 e2) = evalLam st (subst e2 f v1')
                                 where
                                 v0 = (LetRec f t v1 (Var f))
                                 v1' = (subst v1 f v0)
+
+
 
 
 

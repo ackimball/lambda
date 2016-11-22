@@ -1,11 +1,12 @@
-parser changes
-chainl at each level, but not atom
-parens only at atom level
+pair == pair
 
+subtraction
 
-substitution
+evalLam for let rec
 
+type at end of expression
 
+lots of failing cases for -u mode
 
-add let, let rec, if
+compile zipfile
 
