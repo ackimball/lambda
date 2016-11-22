@@ -229,6 +229,7 @@ isFalse = fmap (\s -> if s == "false" then False else True) $ kw "false"
 
 negP, notP, fstP, sndP, unopP :: Parser Unop
 unopP = (ws *> (negP <|> notP <|> fstP <|> sndP))
+unopP0 = (ws *> (notP <|> fstP <|> sndP))
 negP = Neg <$ char '-'
 notP = Not <$ kw "not"
 fstP = Fst <$ kw "fst"
@@ -254,22 +255,20 @@ lexp = (try eqs) <|> (try ifP) <|> (try letRecP) <|> (try letP) <|> (try letP2)
 eqs :: Parser LamExp
 eqs = ws *> chainl1 (try add) (try eqOP)
 
--- <|> (parens eqs)
+add :: Parser LamExp
+add = ws *> (chainl1 (try mul0 <|> mul) (try addOP <|> try minusOP <|> try orOP))
 
-addOp = (ws *>(plusP <|> minusP <|> orP))
-
-add = ws *> (chainl1 (try mul) (try addOP <|> try minusOP <|> try orOP))
-
-mulOp :: Parser Binop
-mulOp = (ws *>(multP <|> divP <|> andP))
+mul0 :: Parser LamExp
+mul0 = ws *> (chainl1 (try unop0) (multOP <|> divOP <|> andOP))
 
 mul :: Parser LamExp
 mul = ws *> (chainl1 (try unop) (multOP <|> divOP <|> andOP))
 
+unop0 :: Parser LamExp
+unop0 = ws *> (chainl1 (try (Unop <$> unopP0 <*> (atom <|> unop0)) <|> try atom) (op))
 
 unop :: Parser LamExp
 unop = ws *> (chainl1 (try (Unop <$> unopP <*> (atom <|> unop)) <|> try atom) (op))
-
 
 atom ::Parser LamExp
 atom = ws *> ((try trueP) <|> (try falseP) <|> (try lamP) <|> (try varP) <|> (try natP) <|> (try pairP) <|> try (parens lexp))
