@@ -522,7 +522,13 @@ t2 = typeChecker Map.empty test2
 
 evalLam :: Store -> LamExp -> Either error LamExp
 evalLam st (Nat x) = Right (Nat x)
-evalLam st v@(Var x) = Left (error ("Error: Undefined variable " ++ x))
+evalLam st v@(Var x) = case Map.lookup (x) st of
+                       Nothing -> Left (error ("Error: Undefined variable " ++ x ++ " store:" ++ (show st)))
+                       Just a -> Right a
+
+  -- Right n
+  --   where n = Map.findWithDefault (Var x) ((error ("Error: Undefined variable " ++ x ++ " store:" ++ (show st)))) st
+
 evalLam st e@(Lam x t la) = pure e
 evalLam st (App e1 e2) = do
                          v1 <- evalLam st e1
@@ -779,22 +785,28 @@ seqParser :: Parser Stmt
 seqParser = ws *> (try (Seq <$> (stmtParser) <*> seqParser) <|> try stmtParserEnd <|> try stmtParserEnd2) -- <|> try stmtParserEnd2)
 
 stmtParser :: Parser Stmt
-stmtParser = (try expCase) <|> (try letCase)
+stmtParser = (try expCase2) <|> (try expCase) <|> (try letCase2) <|> (try letCase)
          where
             expCase = Exp <$> lexp <* sc
+            expCase2 = Exp <$> lexp <* ws <* char ':' <* ws <* typeP <* sc
             letCase = LetS <$> ((kw "let") *> var <* (char '=')) <*> lexp <* sc
+            letCase2 = LetS <$> ((kw "let") *> var <* (char '=')) <*> lexp <* ws <* char ':' <* ws <* typeP <* sc
 
 stmtParserEnd :: Parser Stmt
-stmtParserEnd = (try expCase) <|> (try letCase)
+stmtParserEnd = (try expCase2) <|> (try expCase) <|> (try letCase2) <|> (try letCase)
          where
             expCase = Exp <$> lexp <* eof
+            expCase2 = Exp <$> lexp <* ws <* char ':' <* ws <* typeP <* eof
             letCase = LetS <$> ((kw "let") *> var <* (char '=')) <*> lexp <* eof
+            letCase2 = LetS <$> ((kw "let") *> var <* (char '=')) <*> lexp <* ws <* char ':' <* ws <* typeP <* eof
 
 stmtParserEnd2 :: Parser Stmt
-stmtParserEnd2 = (try expCase) <|> (try letCase)
+stmtParserEnd2 = (try expCase2) <|> (try expCase) <|> (try letCase2) <|> (try letCase)
          where
             expCase = Exp <$> lexp <* sc <* eof
+            expCase2 = Exp <$> lexp <* ws <* char ':' <* ws <* typeP <* sc <* eof
             letCase = LetS <$> ((kw "let") *> var <* (char '=')) <*> lexp <* sc <* eof
+            letCase2 = LetS <$> ((kw "let") *> var <* (char '=')) <*> lexp <* ws <* char ':' <* ws <* typeP  <* sc <* eof
 
 displayProgram :: [LamExp] -> String
 displayProgram [] = ""
