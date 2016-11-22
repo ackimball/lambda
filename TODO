@@ -1,12 +1,7 @@
+fix cases of ==:
 pair == pair
 
-subtraction
+evalLam for let rec:
+add recursion
 
-evalLam for let rec
-
-type at end of expression
-
-lots of failing cases for -u mode
-
-compile zipfile
-
+better fix for subtraction...
