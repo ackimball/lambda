@@ -289,8 +289,7 @@ letP = Let <$> (ws *> kw "let" *> ws *> var) <*> (ws *> (char '=') *> ws *> lexp
 
 test4 = regularParse lexp "let rec toZero:int->int = lambda n:int. if n == 0 then 0 else toZero (n+1) in toZero 5"
 test5 = regularParse lexp "lambda n:int. if n == 0 then 0 else toZero (n+-1)"
-Right test6 = regularParse lexp "let rec fun:int->int = lambda n:int. n + 2 in fun 6"
-Right (t6,_) = typeChecker Map.empty test6
+
 
 letRecP :: Parser LamExp
 letRecP  = LetRec <$> (ws *> kw "let" *> ws *> kw "rec" *> var) <*> (ws *> char ':' *> typeP) <*>
@@ -478,7 +477,11 @@ typeChecker e (Let v l1 l2) = do
                             (t2,e3) <- typeChecker e2 l2
                             (t3,e4) <- typeChecker e3 (Var v)
                             if (t1 == t3) then Right (t1,e4) else Left (error ("Bad type in let" ++ (show t1) ++ (show t2) ++ (show t3)))
-
+typeChecker e (LetRec v t l1 l2) = do
+                                   (t2,e3) <- typeChecker (Map.insert v t e) l1
+                                   (t3,e4) <- typeChecker e3 l2
+                                   (t4,e5) <- typeChecker e4 (Var v)
+                                   if (t == t2 && t == t4) then Right (t4,e5) else Left (error ("Bad type in let rec " ++ (show t3) ))
 
 
 Right test = regularParse lexp "(lambda x:int . if x == 0 then true else false) 10"
@@ -486,6 +489,9 @@ Right test = regularParse lexp "(lambda x:int . if x == 0 then true else false) 
 
 Right test3 = regularParse lexp "(let x = true in lambda x:int.x) 0"
 Right (t3,e) = typeChecker Map.empty test3
+
+Right test6 = regularParse lexp "let rec fun:int->int = lambda n:int. n + 2 in fun 6"
+Right (t6,_) = typeChecker Map.empty test6
 
 subst :: LamExp -> VarName -> LamExp -> LamExp
 subst v@(Var y) x e = if (y == x) then e else v
@@ -603,9 +609,10 @@ evalLam st (If e1 e2 e3) = do
 evalLam st (Let v e1 e2) = do 
                            evalLam st (subst e2 v e1)
 
-
-
-
+evalLam st (LetRec f t v1 e2) = evalLam st (subst e2 f v1')
+                                where
+                                v0 = (LetRec f t v1 (Var f))
+                                v1' = (subst v1 f v0)
 
 
 
@@ -795,6 +802,12 @@ run s = do
     evaled <- evalLams store (map (replaceVars store) (getLams s []))
     Right (displayProgram evaled)
 
+run2 :: Stmt -> Either error String
+run2 s = do
+    --parsed <- regularParse program s
+    store <- evalStmt Map.empty s
+    evaled <- evalLams store (map (replaceVars store) (getLams s []))
+    Right (displayProgram evaled)
 
 --
 
@@ -820,6 +833,21 @@ par [] = do
                                     Right p1 -> putStrLn p1
                                     Left p2 -> error p2
                       Left e2 -> error (show e2::String)
+
+par ["-u"] = do
+   input <- getContents
+   case (regularParse program input) of
+                      Right e1 -> case (run2 e1) of
+                                    Right p1 -> putStrLn p1
+                                    Left p2 -> error p2
+                      Left e2 -> error (show e2::String) 
+par ["-u",fs] = do
+   prog <- (parseFromFile program (fs))
+   case prog of
+                      Right e1 -> case (run2 e1) of
+                                    Right p1 -> putStrLn p1
+                                    Left p2 -> error p2
+                      Left e2 -> error (show e2::String)
 par [fs] = do
    prog <- (parseFromFile program (fs))
    case prog of
@@ -827,7 +855,7 @@ par [fs] = do
                                     Right p1 -> putStrLn p1
                                     Left p2 -> error p2
                       Left e2 -> error (show e2::String)
-
+                     
 par _ = errorExit
 
 usage =  do putStrLn "interp [OPTIONS] FILE (defaults to -, for stdin)"
