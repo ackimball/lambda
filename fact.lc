@@ -1,1 +1,1 @@
-let rec factorial: int -> int = lambda n:int. if n = 0 then 1 else factorial (n*factorial(n-1)) in factorial 5
+5*4*3*2
