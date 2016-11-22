@@ -247,7 +247,7 @@ equalsP = Equals <$ char '=' <* char '='
 
 
 lexp :: Parser LamExp
-lexp = (try eqs) <|> (try ifP) <|> (try letRecP) <|> (try letP)
+lexp = (try eqs) <|> (try ifP) <|> (try letRecP) <|> (try letP) <|> (try letP2)
 
 -- <|> try (parens eqs)  --ws *> (chainl1 mul (ws *> op))
 
@@ -285,6 +285,9 @@ ifP = If <$> (ws *> (kw "if") *> lexp) <*> (ws *> (kw "then") *> lexp) <*> ((ws 
 
 letP :: Parser LamExp
 letP = Let <$> (ws *> kw "let" *> ws *> var) <*> (ws *> (char '=') *> ws *> lexp) <*> (ws *> kw "in" *> ws *> lexp)
+
+letP2 :: Parser LamExp
+letP2 = Let <$> (ws *> kw "let" *> ws *> var <* ws <* char ':' <* typeP) <*> (ws *> (char '=') *> ws *> lexp) <*> (ws *> kw "in" *> ws *> lexp)
 
 
 test4 = regularParse lexp "let rec toZero:int->int = lambda n:int. if n == 0 then 0 else toZero (n+1) in toZero 5"
@@ -509,7 +512,7 @@ subst (Binop e1 Equals e2) x e3 = Binop (subst e1 x e3) Equals (subst e2 x e3)
 subst (Unop Neg e1) x e3 = Unop Neg (subst e1 x e3)
 subst (Unop Fst e1) x e3 = Unop Fst (subst e1 x e3)
 subst (Unop Snd e1) x e3 = Unop Snd (subst e1 x e3)
-subst (If z1 z2 z3) x e3 = If (subst z1 x e3) (subst z2 x e3) (subst z3 x e3) 
+subst (If z1 z2 z3) x e3 = If (subst z1 x e3) (subst z2 x e3) (subst z3 x e3)
 subst (Lam v t y) x e3 = Lam v t (subst y x e3)
 
 -- subst (Let v l1 l2) x e3 = Let v (subst )
@@ -599,14 +602,14 @@ evalLam st (Binop x Minus y) = do
                               Nat int2 <- evalLam st y
                               Right (Nat (int1 - int2))
 
-evalLam st (If e1 e2 e3) = do 
+evalLam st (If e1 e2 e3) = do
                               v1 <- evalLam st e1
                               if (v1 == TrueL) then do b1 <- evalLam st e2
                                                        Right b1
-                                                else do b2 <- evalLam st e3 
-                                                        Right b2 
+                                                else do b2 <- evalLam st e3
+                                                        Right b2
 
-evalLam st (Let v e1 e2) = do 
+evalLam st (Let v e1 e2) = do
                            evalLam st (subst e2 v e1)
 
 evalLam st (LetRec f t v1 e2) = evalLam st (subst e2 f v1')
@@ -840,7 +843,7 @@ par ["-u"] = do
                       Right e1 -> case (run2 e1) of
                                     Right p1 -> putStrLn p1
                                     Left p2 -> error p2
-                      Left e2 -> error (show e2::String) 
+                      Left e2 -> error (show e2::String)
 par ["-u",fs] = do
    prog <- (parseFromFile program (fs))
    case prog of
@@ -855,7 +858,7 @@ par [fs] = do
                                     Right p1 -> putStrLn p1
                                     Left p2 -> error p2
                       Left e2 -> error (show e2::String)
-                     
+
 par _ = errorExit
 
 usage =  do putStrLn "interp [OPTIONS] FILE (defaults to -, for stdin)"
