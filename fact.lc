@@ -1,11 +1,1 @@
-let zero = lambda s z. z;
-let false = lambda a b. b;
-let true = lambda a b. a;
-let isZero = lambda n. n(lambda x. false) true;
-let succ = lambda n. lambda s z. s (n s z);
-let Y = lambda f.(lambda x.f(x x)) (lambda x.f(x x));
-let five = succ (succ (succ (succ (succ zero))));
-let plus = lambda m n. m succ n;
-let mult = lambda m n. m (plus n) zero;
-let fact = lambda Y. lambda factRec. lambda n. (isZero n) zero (mult n (factRec (pred n)));
-zero
+let rec factorial: int -> int = lambda n:int if n = 0 then 1 else factorial (n*factorial(n-1)) in factorial 5
