@@ -597,13 +597,11 @@ evalLam st (Binop x Equals y) = do
 evalLam st (Binop x@_ Plus y@_) = do
                               Nat int1 <- evalLam st x
                               Nat int2 <- evalLam st y
-                              _ <- Left (error "You were unsafe!")
                               Right (Nat (int1 + int2))
 
 evalLam st (Binop x Minus y) = do
                               Nat int1 <- evalLam st x
                               Nat int2 <- evalLam st y
-                              _ <- Left (error "You were unsafe!")
                               Right (Nat (int1 - int2))
 
 evalLam st (If e1 e2 e3) = do
