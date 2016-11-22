@@ -247,7 +247,7 @@ equalsP = Equals <$ char '=' <* char '='
 
 
 lexp :: Parser LamExp
-lexp = (try eqs) <|> (try ifP) <|> (try letP) <|> (try letRecP)
+lexp = (try eqs) <|> (try ifP) <|> (try letRecP) <|> (try letP)
 
 -- <|> try (parens eqs)  --ws *> (chainl1 mul (ws *> op))
 
@@ -286,6 +286,11 @@ ifP = If <$> (ws *> (kw "if") *> lexp) <*> (ws *> (kw "then") *> lexp) <*> ((ws 
 letP :: Parser LamExp
 letP = Let <$> (ws *> kw "let" *> ws *> var) <*> (ws *> (char '=') *> ws *> lexp) <*> (ws *> kw "in" *> ws *> lexp)
 
+
+test4 = regularParse lexp "let rec toZero:int->int = lambda n:int. if n == 0 then 0 else toZero (n+1) in toZero 5"
+test5 = regularParse lexp "lambda n:int. if n == 0 then 0 else toZero (n+-1)"
+test6 = regularParse lexp "let rec fun:int->int = lambda n:int. n + 2 in fun 6"
+t6 = typeChecker test6
 
 letRecP :: Parser LamExp
 letRecP  = LetRec <$> (ws *> kw "let" *> ws *> kw "rec" *> var) <*> (ws *> char ':' *> typeP) <*>
@@ -376,108 +381,117 @@ en = Map.empty
 
 
 
-typeChecker :: Env -> LamExp -> Either error Type
-typeChecker e (Nat x) = Right (IntT)
-typeChecker e (Var v) = Right (findWithDefault (IntT) v e)
+typeChecker :: Env -> LamExp -> Either error (Type,Env)
+typeChecker e (Nat x) = Right (IntT,e)
+typeChecker e (Var v) = Right ((findWithDefault (IntT) v e),e)
 typeChecker e (Lam x t la) = do
-                             t2 <- typeChecker (Map.insert x t e) la
-                             Right (FuncT t t2)
+                             (t2,e2) <- typeChecker (Map.insert x t e) la
+                             Right ((FuncT t t2),e2)
 typeChecker e (App l1 l2) = do
-                            (FuncT t1 t2) <- isFunc
-                            t3 <- typeChecker e l2
-                            if (t1 == t3) then Right t2 else (Left (error "argument has wrong type"))
+                            ((FuncT t1 t2),_) <- isFunc
+                            (t3,e2) <- typeChecker e l2
+                            if (t1 == t3) then Right (t2,e2) else (Left (error "argument has wrong type"))
                             where isFunc = case (typeChecker e l1) of
-                                            Right e@(FuncT t1 t2) -> Right e
-                                            Right z@_ -> Left ((error ("non function application - applying to type: " ++ (show z))))
-                                            Left e2 -> Left e2
+                                            Right (n@(FuncT t1 t2),e3) -> Right (n,e3)
+                                            Right (z@_,_) -> Left ((error ("non function application - applying to type: " ++ (show z))))
+                                            Left  (_,_) -> Left (error ("here!"))
 typeChecker e (Pair a b) = do
-                           t1 <- typeChecker e a
-                           t2 <- typeChecker e b
-                           Right (PairT t1 t2)
-typeChecker e (TrueL) = Right BoolT
-typeChecker e (FalseL) = Right BoolT
+                           (t1,e2) <- typeChecker e a
+                           (t2,e3) <- typeChecker e b
+                           Right ((PairT t1 t2),e3)
+typeChecker e (TrueL) = Right (BoolT,e)
+typeChecker e (FalseL) = Right (BoolT,e)
 typeChecker e (Unop Not x) = do
-                            t1 <- typeChecker e x
-                            if (t1 == BoolT) then Right t1 else (Left (error "Not is applied to a non-boolean"))
+                            (t1,e2) <- typeChecker e x
+                            if (t1 == BoolT) then Right (t1,e2) else (Left (error "Not is applied to a non-boolean"))
 typeChecker e (Unop Neg x) = do
-                            t1 <- typeChecker e x
-                            if (t1 == IntT) then Right t1 else (Left (error "Neg is applied to a non-int"))
+                            (t1,e2) <- typeChecker e x
+                            if (t1 == IntT) then Right (t1,e2) else (Left (error "Neg is applied to a non-int"))
 typeChecker e (Unop Fst x) = do
-                            t1 <- typeChecker e x
+                            (t1,e2) <- typeChecker e x
                             case t1 of
-                               (PairT x y) -> Right t1
+                               (PairT x y) -> Right (t1,e2)
                                _ -> Left (error "Fst is applied to a non-pair")
 typeChecker e (Unop Snd x) = do
-                            t1 <- typeChecker e x
+                            (t1,e2) <- typeChecker e x
                             case t1 of
-                               (PairT x y) -> Right t1
+                               (PairT x y) -> Right (t1,e2)
                                _ -> Left (error "2nd is applied to a non-pair")
 typeChecker e (Binop x Mult y) = do
-                            t1 <- typeChecker e x
-                            t2 <- typeChecker e y
+                            (t1,e2) <- typeChecker e x
+                            (t2,e3) <- typeChecker e2 y
                             case (t1,t2) of
-                               (IntT,IntT) -> Right IntT
+                               (IntT,IntT) -> Right (IntT,e3)
                                _ -> Left (error "Mult is applied to non-ints")
 typeChecker e (Binop x Div y) = do
-                            t1 <- typeChecker e x
-                            t2 <- typeChecker e y
+                            (t1,e2) <- typeChecker e x
+                            (t2,e3) <- typeChecker e2 y
                             case (t1,t2) of
-                                (IntT,IntT) -> Right IntT
+                                (IntT,IntT) -> Right (IntT,e3)
                                 _ -> Left (error "Div is applied to non-ints")
 typeChecker e (Binop x And y) = do
-                            t1 <- typeChecker e x
-                            t2 <- typeChecker e y
+                            (t1,e2) <- typeChecker e x
+                            (t2,e3) <- typeChecker e2 y
                             case (t1,t2) of
-                                (BoolT,BoolT) -> Right BoolT
+                                (BoolT,BoolT) -> Right (BoolT,e3)
                                 _ -> Left (error "And is applied to non-bools")
 typeChecker e (Binop x Or y) = do
-                            t1 <- typeChecker e x
-                            t2 <- typeChecker e y
+                            (t1,e2) <- typeChecker e x
+                            (t2,e3) <- typeChecker e2 y
                             case (t1,t2) of
-                                (BoolT,BoolT) -> Right BoolT
+                                (BoolT,BoolT) -> Right (BoolT,e3)
                                 _ -> Left (error "Or is applied to non-bools")
 typeChecker e (Binop (Pair a b) Equals (Pair c d)) = do
-                            ta <- typeChecker e a
-                            tc <- typeChecker e c
-                            tb <- typeChecker e b
-                            td <- typeChecker e d
-                            if (ta == tc && tb == td) then Right IntT else Left (error "Mismatched types in pair")
+                            (ta,e2) <- typeChecker e a
+                            (tc,e3) <- typeChecker e2 c
+                            (tb,e4) <- typeChecker e3 b
+                            (td,e5) <- typeChecker e4 d
+                            if (ta == tc && tb == td) then Right (IntT,e5) else Left (error "Mismatched types in pair")
 typeChecker e (Binop x Equals y) = do
-                            t1 <- typeChecker e x
-                            t2 <- typeChecker e y
+                            (t1,e2) <- typeChecker e x
+                            (t2,e3) <- typeChecker e2 y
                             case (t1,t2) of
-                                (BoolT,BoolT) -> Right BoolT
-                                (IntT, IntT) -> Right BoolT
+                                (BoolT,BoolT) -> Right (BoolT,e3)
+                                (IntT, IntT) -> Right (BoolT,e3)
                                 (_,FuncT x y) -> Left (error "Equals is applied to a function")
                                 (FuncT x y,_) -> Left (error "Equals is applied to a function")
                                 _ -> Left (error "Equals is applied to functions or there's a type mismatch")
 typeChecker e (Binop x Plus y) = do
-                            t1 <- typeChecker e x
-                            t2 <- typeChecker e y
+                            (t1,e2) <- typeChecker e x
+                            (t2,e3) <- typeChecker e2 y
                             case (t1,t2) of
-                               (IntT,IntT) -> Right IntT
+                               (IntT,IntT) -> Right (IntT,e3)
                                _ -> Left (error "Add is applied to non-ints")
 typeChecker e (Binop x Minus y) = do
-                            t1 <- typeChecker e x
-                            t2 <- typeChecker e y
+                            (t1,e2) <- typeChecker e x
+                            (t2,e3) <- typeChecker e2 y
                             case (t1,t2) of
-                               (IntT,IntT) -> Right IntT
+                               (IntT,IntT) -> Right (IntT,e3)
                                _ -> Left (error "Minus is applied to non-ints")
-
-
 typeChecker e (If l1 l2 l3) = do
-                            t1 <- typeChecker e l1
-                            t2 <- typeChecker e l2
-                            t3 <- typeChecker e l3
-                            if (t1 == BoolT && t2 == t3) then Right t3 else Left (error ("Bad type in If statement" ++ (show t1) ++ (show t2) ++ (show t3)))
+                            (t1,e2) <- typeChecker e l1
+                            (t2,e3) <- typeChecker e2 l2
+                            (t3,e4) <- typeChecker e3 l3
+                            if (t1 == BoolT && t2 == t3) then Right (t3,e4) else Left (error ("Bad type in If statement" ++ (show t1) ++ (show t2) ++ (show t3)))
+typeChecker e (Let v l1 l2) = do
+                            (t1,e2) <- typeChecker e l1
+                            (t2,e3) <- typeChecker e2 l2
+                            (t3,e4) <- typeChecker e3 (Var v)
+                            if (t1 == t3) then Right (t1,e4) else Left (error ("Bad type in let" ++ (show t1) ++ (show t2) ++ (show t3)))
 
-Right test = regularParse lexp "lambda x:int . if x == 0 then true else false"
-t = typeChecker Map.empty test
 
+
+Right test = regularParse lexp "(lambda x:int . if x == 0 then true else false) 10"
+-- t = typeChecker Map.empty test
+
+Right test3 = regularParse lexp "(let x = true in lambda x:int.x) 0"
+Right (t3,e) = typeChecker Map.empty test3
 
 subst :: LamExp -> VarName -> LamExp -> LamExp
 subst v@(Var y) x e = if (y == x) then e else v
 subst v@(Nat y) x e = Nat y
+subst (TrueL) x e = TrueL
+subst (FalseL) x e = FalseL
 subst (App e1 e2) x e3 = app (subst e1 x e3) (subst e2 x e3)
 subst (Binop e1 Mult e2) x e3 = Binop (subst e1 x e3) Mult (subst e2 x e3)
 subst (Binop e1 Mult e2) x e3 = Binop (subst e1 x e3) Mult (subst e2 x e3)
@@ -485,10 +499,17 @@ subst (Binop e1 Div e2) x e3 = Binop (subst e1 x e3) Div (subst e2 x e3)
 subst (Binop e1 Plus e2) x e3 = Binop (subst e1 x e3) Plus (subst e2 x e3)
 subst (Binop e1 And e2) x e3 = Binop (subst e1 x e3) And (subst e2 x e3)
 subst (Binop e1 Or e2) x e3 = Binop (subst e1 x e3) Or (subst e2 x e3)
+subst (Binop e1 Equals e2) x e3 = Binop (subst e1 x e3) Equals (subst e2 x e3)
 subst (Unop Neg e1) x e3 = Unop Neg (subst e1 x e3)
 subst (Unop Fst e1) x e3 = Unop Fst (subst e1 x e3)
 subst (Unop Snd e1) x e3 = Unop Snd (subst e1 x e3)
 subst (If z1 z2 z3) x e3 = If (subst z1 x e3) (subst z2 x e3) (subst z3 x e3) 
+subst (Lam v t y) x e3 = Lam v t (subst y x e3)
+
+-- subst (Let v l1 l2) x e3 = Let v (subst )
+
+Right test2 = regularParse lexp "let x = 1 in lambda x:int.x + 2"
+t2 = typeChecker Map.empty test2
 
 evalLam :: Store -> LamExp -> Either error LamExp
 evalLam st (Nat x) = Right (Nat x)
@@ -579,7 +600,8 @@ evalLam st (If e1 e2 e3) = do
                                                 else do b2 <- evalLam st e3 
                                                         Right b2 
 
-
+evalLam st (Let v e1 e2) = do 
+                           evalLam st (subst e2 v e1)
 
 
 
@@ -706,7 +728,7 @@ getLams (Seq s1 s2) l = (getLams s2 (getLams s1 l) )
 checkLams :: [LamExp] -> Either error [Type]
 checkLams [] = Right []
 checkLams (l:ls) = do
-                    t1 <- typeChecker Map.empty l
+                    (t1,_) <- typeChecker Map.empty l
                     t <- checkLams ls
                     Right (t1:t)
 
@@ -743,19 +765,19 @@ seqParser :: Parser Stmt
 seqParser = ws *> (try (Seq <$> (stmtParser) <*> seqParser) <|> try stmtParserEnd <|> try stmtParserEnd2) -- <|> try stmtParserEnd2)
 
 stmtParser :: Parser Stmt
-stmtParser = expCase <|> letCase
+stmtParser = (try expCase) <|> (try letCase)
          where
             expCase = Exp <$> lexp <* sc
             letCase = LetS <$> ((kw "let") *> var <* (char '=')) <*> lexp <* sc
 
 stmtParserEnd :: Parser Stmt
-stmtParserEnd = expCase <|> letCase
+stmtParserEnd = (try expCase) <|> (try letCase)
          where
             expCase = Exp <$> lexp <* eof
             letCase = LetS <$> ((kw "let") *> var <* (char '=')) <*> lexp <* eof
 
 stmtParserEnd2 :: Parser Stmt
-stmtParserEnd2 = expCase <|> letCase
+stmtParserEnd2 = (try expCase) <|> (try letCase)
          where
             expCase = Exp <$> lexp <* sc <* eof
             letCase = LetS <$> ((kw "let") *> var <* (char '=')) <*> lexp <* sc <* eof
