@@ -1,0 +1,6 @@
+(lambda x:(int,int). fst x) (75,0);
+fst (50,100);
+- (-5);
+94 / (1 + 1);
+let rec fact : int -> int = lambda n:int. if n == 0 then 1 else n * fact (n - 1);
+fact 5
