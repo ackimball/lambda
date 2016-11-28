@@ -640,7 +640,7 @@ evalStmt st (Seq s1 s2) = case (evalStmt st s1) of
                                                  Right k1 -> Right k1
                                                  Left k2 -> Left k2
                                (Left e2) -> Left e2
-evalStmt st (LetRS x 1) = undefined
+evalStmt st (LetRS v t e) = undefined
 
 evalStmt2 :: Store -> [LamExp] -> Stmt -> Either error [LamExp]
 evalStmt2 st l (LetS x a) = Right l
@@ -735,6 +735,11 @@ displayProgram :: [LamExp] -> String
 displayProgram [] = ""
 displayProgram (l:ls) = (displayProgram ls) ++ (show l) ++ "\n"
 
+deleteLast :: String -> String -> String
+deleteLast [] r = r
+deleteLast [s] r = r
+deleteLast (s:st) r = deleteLast st (r ++ [s])
+
 
 run :: Stmt -> Either error String
 run s = do
@@ -742,7 +747,7 @@ run s = do
     store <- evalStmt Map.empty s
     types <- checkLams (map (replaceVars store) (getLams s []))
     evaled <- evalLams store (map (replaceVars store) (getLams s []))
-    Right (displayProgram evaled)
+    Right (deleteLast (displayProgram evaled) [])
 
 run2 :: Stmt -> Either error String
 run2 s = do
