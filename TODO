@@ -1,13 +1,13 @@
-handle parens in argument in lambda expression
+handle parens in argument in lambda expression - C
 
-type declarations in let statements
+parse type declarations in let statements - C
 
-eval let
+eval let - W
 
-eval let rec
+eval let rec - W
 
--u flag
+-u flag - A
 
-adding type on end inside parenthesis (12:int)
+adding type on end inside parenthesis (12:int) - C
 
-extra output line
+free variables - A
