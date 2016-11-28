@@ -1,7 +1,11 @@
-fix cases of ==:
-pair == pair
+handle parens in argument in lambda expression
 
-evalLam for let rec:
-add recursion
+type declarations in let statements
 
-better fix for subtraction...
+eval let
+
+eval let rec
+
+-u flag
+
+adding type on end inside parenthesis (12:int)
