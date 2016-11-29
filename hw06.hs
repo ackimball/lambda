@@ -612,10 +612,11 @@ evalLam st (Binop x Minus y) = do
 
 evalLam st (If e1 e2 e3) = do
                               v1 <- evalLam st e1
-                              if (v1 == TrueL) then do b1 <- evalLam st e2
-                                                       Right b1
-                                                else do b2 <- evalLam st e3
-                                                        Right b2
+                              (t,e) <- typeChecker Map.empty v1 
+                              case (v1, t) of
+                                 (TrueL, BoolT) -> evalLam st e2
+                                 (FalseL, BoolT) -> evalLam st e3
+                                 (_,_) -> Left (error "type mismatch in If")
 
 evalLam st (Let v e1 e2) = do
                            evalLam st (subst e2 v e1)
