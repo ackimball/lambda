@@ -1,0 +1,170 @@
+DIVERGENCE
+and: 1/1
+cbv: 1/1
+if: 1/1
+letrec_expr: 1/1
+letrec_loop: 1/1
+pair: 1/1
+
+FAILING
+avoid_loop: 1/1
+bad: 1/1
+bad_ascription: 1/1
+empty: 1/1
+if_mismatch: 1/1
+not_int: 1/1
+pair_ignore: 1/1
+parens: 1/1
+parse: 1/1
+plus_type: 1/1
+rec_int: 1/1
+ty_id: 1/1
+ty_if: 1/1
+unbound: 0/1
+Expected an error (non-zero exit code)
+Failing file:
+lambda x:int. y     -------
+
+xyz-run: 1/1
+
+PARSEABLE OUTPUT IN -u
+parse result of bad_ascription: 0/1
+Expected parseable output in -u mode    *********
+
+parse result of if_mismatch: 1/1
+parse result of pair_ignore: 0/1      *******
+Expected parseable output in -u mode
+
+parse result of ty_id: 1/1
+
+FAILING IN -u
+ty_if: 0/1     -------------
+Expected an error in -u mode
+Failing file:
+(lambda x : int. if x then 0 else 1) 5
+
+
+NUMBERS
+0: 1/1
+1: 0/1    -----------
+Expected 1, got
+Failing file:
+if (0 == 0) and false then 0 else 1
+
+1: 1/1
+1: 1/1
+100: 0/1   --------------
+Expected 100, got
+Failing file:
+snd (50,100)
+
+11: 0/1
+Expected 11, got
+Failing file:
+let x = 4 in let y : int = 7 in x + y  --------------------
+
+12: 0/1
+Expected 12, got
+Failing file:
+(12 : int)  ----------------------------
+
+120: 0/1
+Expected 120, got
+Failing file:
+let rec fact : int -> int = lambda n:int. if n == 0 then 1 else n * fact (n - 1);  ********
+fact 5
+120: 0/1
+Expected 120, got
+Failing file:
+let rec fact : int -> int = lambda n:int. if n == 0 then 1 else n * fact (n - 1) in  *******
+fact 5
+200: 1/1
+200: 0/1
+Expected 200, got
+Failing file:
+(lambda x:int. x) (10 * 20)  ------------
+
+30: 0/1
+Expected 30, got
+Failing file:
+(lambda x:(int,int->bool). fst x) (30,lambda x:int. false)
+
+32: 0/1
+Expected 32, got
+Failing file:
+let x = 0 in let y = 32 in x + y   --------------------
+
+47: 0/1
+Expected 47, got
+Failing file:
+94 / (1 + 1)              ---------------
+
+47: 1/1
+5: 0/1
+Expected 5, got
+Failing file:
+- (-5)        -------------------
+
+50: 0/1
+Expected 50, got
+Failing file:
+fst (50,100)   ---------------
+
+75: 0/1
+Expected 75, got
+Failing file:
+(lambda x:(int,int). fst x) (75,0)  --------------
+
+
+EVALUATE MULTIPLE EXPRESSIONS
+1: 0/1
+Expected 1 lines of output, got 2
+Failing file:
+lambda x:bool. x    --------------
+
+1: 0/1
+Expected 1 lines of output, got 2
+Failing file:
+lambda x:int.            ----------------------
+
+
+        x
+
+2: 0/1
+Expected 2 lines of output, got 0
+Failing file:
+let zero : int = 10 - 15 + 5;  *****************************
+let succ = lambda n:int. n + 1;
+succ (succ zero);
+succ (succ (succ zero))
+3: 0/1
+Expected 3 lines of output, got 0
+Failing file:
+lambda x:int. x; lambda y:(bool,bool). y; lambda (z:int->int). z    ***************
+
+4: 0/1
+Expected 4 lines of output, got 0
+Failing file:                         *********************
+let zero = 0;
+
+
+zero; let succ : int ->
+int
+= lambda n:
+int
+
+. n +
+
+1; succ zero; succ zero;
+
+
+
+
+
+
+zero
+
+
+FACTORIAL IN fact.lc
+fact: 1/1
+FINAL GRADE: 28 / 50

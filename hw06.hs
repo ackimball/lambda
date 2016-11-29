@@ -86,12 +86,12 @@ instance Show LamExp where
      | z < 1 = "if " ++ show' 1 la1 ++ " then " ++ show' 1 la2 ++ " else " ++ show' 1 la3
      | otherwise = "(if" ++ show' 1 la1 ++ " then " ++ show' 1 la2 ++ " else " ++ show' 1 la3 ++ ")"
     show' z (Let v la1 la2)
-     | z < 1 = "let " ++ v ++ show' 1 la1 ++ " in " ++ show' 1 la2
-     | otherwise = "(let " ++ v ++ show' 1 la1 ++ " in " ++ show' 1 la2 ++ ")"
+     | z < 1 = "let " ++ v ++ "=" ++ show' 1 la1 ++ " in " ++ show' 1 la2
+     | otherwise = "(let " ++ v  ++ "=" ++ show' 1 la1 ++ " in " ++ show' 1 la2 ++ ")"
     show' z (LetRec v t la1 la2)
      | z < 1 = "let rec " ++ v ++ " : " ++ show t ++ " = " ++ show' 1 la1 ++ " in " ++ show' 1 la2
      | otherwise = "(let rec " ++ v ++ " : " ++ show t ++ " = " ++ show' 1 la1 ++ " in " ++ show' 1 la2 ++ ")"
-    show' _ (Assign la t) = "(" ++ show' 1 la ++ show t ++ ")"
+    show' _ (Assign la t) = "(" ++ show' 1 la ++ ":" ++ show t ++ ")"
     show' _ (Nat n) = show n
     show' _ TrueL = "true"
     show' _ FalseL = "false"
@@ -272,7 +272,10 @@ unop :: Parser LamExp
 unop = ws *> (chainl1 (try (Unop <$> unopP <*> (atom <|> unop)) <|> try atom) (op))
 
 atom ::Parser LamExp
-atom = ws *> ((try trueP) <|> (try falseP) <|> (try lamP) <|> (try varP) <|> (try natP) <|> (try pairP) <|> try (parens lexp))
+atom = ws *> ((try trueP) <|> (try falseP) <|> (try lamP) <|> (try varP) <|> (try natP) <|> (try pairP) <|> (try assignP) <|> try (parens lexp))
+
+assignP :: Parser LamExp
+assignP = Assign <$> (ws *> (char '(') *> ws *> lexp) <*> (ws *> (char ':') *> ws *> typeP <* ws <* (char ')') <* ws)
 
 natP :: Parser LamExp
 natP = Nat <$> num
@@ -287,7 +290,11 @@ letP :: Parser LamExp
 letP = Let <$> (ws *> kw "let" *> ws *> var) <*> (ws *> (char '=') *> ws *> lexp) <*> (ws *> kw "in" *> ws *> lexp)
 
 letP2 :: Parser LamExp
-letP2 = Let <$> (ws *> kw "let" *> ws *> var <* ws <* char ':' <* typeP) <*> (ws *> (char '=') *> ws *> lexp) <*> (ws *> kw "in" *> ws *> lexp)
+letP2 = let v = ws *> kw "let" *> ws *> var
+            t = ws *> char ':' *> ws *> typeP
+            e1 = ws *> (char '=') *> ws *> lexp
+            e2 = ws *> kw "in" *> ws *> lexp
+        in Let <$> v <*> (Assign <$> e1 <*> t) <*> e2
 
 
 test4 = regularParse lexp "let rec toZero:int->int = lambda n:int. if n == 0 then 0 else toZero (n+1) in toZero 5"
@@ -474,18 +481,20 @@ typeChecker e (If l1 l2 l3) = do
                             (t1,e2) <- typeChecker e l1
                             (t2,e3) <- typeChecker e2 l2
                             (t3,e4) <- typeChecker e3 l3
-                            if (t1 == BoolT && t2 == t3) then Right (t3,e4) else Left (error ("Bad type in If statement" ++ (show t1) ++ (show t2) ++ (show t3)))
+                            if (t1 == BoolT && t2 == t3) then Right (t3,e4) else Left (error ("Bad type in If statement " ++ " " ++(show t1)  ++ " " ++ (show t2)  ++ " " ++ (show t3)))
 typeChecker e (Let v l1 l2) = do
                             (t1,e2) <- typeChecker e l1
                             (t2,e3) <- typeChecker e2 l2
                             (t3,e4) <- typeChecker e3 (Var v)
-                            if (t1 == t3) then Right (t1,e4) else Left (error ("Bad type in let" ++ (show t1) ++ (show t2) ++ (show t3)))
+                            if (t1 == t3) then Right (t1,e4) else Left (error ("Bad type in let " ++ (show t1)  ++ " " ++ (show t2)  ++ " " ++ (show t3)))
 typeChecker e (LetRec v t l1 l2) = do
                                    (t2,e3) <- typeChecker (Map.insert v t e) l1
                                    (t3,e4) <- typeChecker e3 l2
                                    (t4,e5) <- typeChecker e4 (Var v)
                                    if (t == t2 && t == t4) then Right (t4,e5) else Left (error ("Bad type in let rec " ++ (show t3) ))
-
+typeChecker e (Assign l1 t) = do
+                             (t2, e2) <- typeChecker e l1
+                             if (t2 == t) then Right (t, e2) else Left (error ("Bad type in expr " ++ show t))
 
 Right test = regularParse lexp "(lambda x:int . if x == 0 then true else false) 10"
 -- t = typeChecker Map.empty test
@@ -501,6 +510,7 @@ subst v@(Var y) x e = if (y == x) then e else v
 subst v@(Nat y) x e = Nat y
 subst (TrueL) x e = TrueL
 subst (FalseL) x e = FalseL
+subst (Assign e1 t) x e = Assign e1 t
 subst (App e1 e2) x e3 = app (subst e1 x e3) (subst e2 x e3)
 subst (Binop e1 Mult e2) x e3 = Binop (subst e1 x e3) Mult (subst e2 x e3)
 subst (Binop e1 Mult e2) x e3 = Binop (subst e1 x e3) Mult (subst e2 x e3)
@@ -514,6 +524,7 @@ subst (Unop Fst e1) x e3 = Unop Fst (subst e1 x e3)
 subst (Unop Snd e1) x e3 = Unop Snd (subst e1 x e3)
 subst (If z1 z2 z3) x e3 = If (subst z1 x e3) (subst z2 x e3) (subst z3 x e3)
 subst (Lam v t y) x e3 = Lam v t (subst y x e3)
+subst (Let v e1 e2) x e3 = Let v (subst e1 x e3) (subst e2 x e3)
 
 -- subst (Let v l1 l2) x e3 = Let v (subst )
 
@@ -612,7 +623,7 @@ evalLam st (Binop x Minus y) = do
 
 evalLam st (If e1 e2 e3) = do
                               v1 <- evalLam st e1
-                              (t,e) <- typeChecker Map.empty v1 
+                              (t,e) <- typeChecker Map.empty v1
                               case (v1, t) of
                                  (TrueL, BoolT) -> evalLam st e2
                                  (FalseL, BoolT) -> evalLam st e3
@@ -625,6 +636,11 @@ evalLam st (LetRec f t v1 e2) = evalLam st (subst e2 f v1')
                                 where
                                 v0 = (LetRec f t v1 (Var f))
                                 v1' = (subst v1 f v0)
+evalLam st (Assign e1 t) = do
+                           v1 <- evalLam st e1
+                           (t2, e2) <- typeChecker Map.empty v1
+                           if (t == t2) then Right (v1) else Left (error "type mismatch in expr")
+
 
 
 
@@ -764,13 +780,13 @@ run2 s = do
     store <- evalStmt Map.empty s
     checked <- fvCheck (map (replaceVars store) (getLams s []))
     evaled <- evalLams store (map (replaceVars store) (getLams s []))
-    Right (displayProgram evaled)
+    Right (deleteLast (displayProgram evaled) [])
 
 --Checking for free variables
 fv :: LamExp -> Set VarName
 fv (Var x) = Set.singleton x
 fv (App e1 e2) = Set.union (fv e1) (fv e2)
-fv (Lam x t e) = Set.difference (fv e) (Set.singleton x)  
+fv (Lam x t e) = Set.difference (fv e) (Set.singleton x)
 fv _ = Set.empty
 
 --e is closed IFF fv(e) = empty set

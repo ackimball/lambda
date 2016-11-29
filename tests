@@ -1,0 +1,13 @@
+if (0 == 0) and false then 0 else 1;
+snd (50,100);
+(12 : int);
+(lambda x:int. x) (10 * 20);
+let x = 4 in let y : int = 7 in x + y;
+let x = 0 in let y = 32 in x + y;
+94 / (1 + 1);
+- (-5);
+fst (50,100);
+(lambda x:(int,int). fst x) (75,0);
+lambda x:bool. x;
+
+let zero : int = 10 - 15 + 5; 
