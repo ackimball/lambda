@@ -667,6 +667,13 @@ checkLams (l:ls) = do
                     t <- checkLams ls
                     Right (t1:t)
 
+fvCheck :: [LamExp] -> Either error [LamExp]
+fvCheck [] = Right []
+fvCheck (l:ls) = do
+                 f <- isClosed l
+                 v <- fvCheck ls
+                 Right (f:v)
+
 
 evalLams :: Store -> [LamExp] -> Either error [LamExp]
 evalLams st [] = Right []
@@ -746,6 +753,7 @@ run :: Stmt -> Either error String
 run s = do
     --parsed <- regularParse program s
     store <- evalStmt Map.empty s
+    checked <- fvCheck (map (replaceVars store) (getLams s []))
     types <- checkLams (map (replaceVars store) (getLams s []))
     evaled <- evalLams store (map (replaceVars store) (getLams s []))
     Right (deleteLast (displayProgram evaled) [])
@@ -754,10 +762,20 @@ run2 :: Stmt -> Either error String
 run2 s = do
     --parsed <- regularParse program s
     store <- evalStmt Map.empty s
+    checked <- fvCheck (map (replaceVars store) (getLams s []))
     evaled <- evalLams store (map (replaceVars store) (getLams s []))
     Right (displayProgram evaled)
 
+--Checking for free variables
+fv :: LamExp -> Set VarName
+fv (Var x) = Set.singleton x
+fv (App e1 e2) = Set.union (fv e1) (fv e2)
+fv (Lam x t e) = Set.difference (fv e) (Set.singleton x)  
+fv _ = Set.empty
 
+--e is closed IFF fv(e) = empty set
+isClosed :: LamExp -> Either error LamExp
+isClosed e = if (fv e == Set.empty) then Right e else Left (error "unbound variables")
 
 main :: IO ()
 main = getArgs >>= par
