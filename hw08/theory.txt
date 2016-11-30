@@ -1,0 +1,3 @@
+Typing Rules for the Pi Calculus
+
+Please use ASCII notation for inference rules, like in the lecture notes.
