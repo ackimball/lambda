@@ -9,5 +9,26 @@ let x = 0 in let y = 32 in x + y;
 fst (50,100);
 (lambda x:(int,int). fst x) (75,0);
 lambda x:bool. x;
+let zero : int = 10 - 15 + 5;
+let succ = lambda n:int. n + 1;
+succ (succ zero);
+succ (succ (succ zero));
+lambda x:int. x; lambda y:(bool,bool). y; lambda (z:int->int). z;
+let zero = 0;
 
-let zero : int = 10 - 15 + 5; 
+
+zero; let succ : int ->
+int
+= lambda n:
+int
+
+. n +
+
+1; succ zero; succ zero;
+
+
+
+
+
+
+zero

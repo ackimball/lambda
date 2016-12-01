@@ -87,7 +87,7 @@ Failing file:
 30: 0/1
 Expected 30, got
 Failing file:
-(lambda x:(int,int->bool). fst x) (30,lambda x:int. false)
+(lambda x:(int,int->bool). fst x) (30,lambda x:int. false)   ------------
 
 32: 0/1
 Expected 32, got
@@ -133,18 +133,18 @@ lambda x:int.            ----------------------
 2: 0/1
 Expected 2 lines of output, got 0
 Failing file:
-let zero : int = 10 - 15 + 5;  *****************************
+let zero : int = 10 - 15 + 5;  ------------------------
 let succ = lambda n:int. n + 1;
 succ (succ zero);
 succ (succ (succ zero))
 3: 0/1
 Expected 3 lines of output, got 0
 Failing file:
-lambda x:int. x; lambda y:(bool,bool). y; lambda (z:int->int). z    ***************
+lambda x:int. x; lambda y:(bool,bool). y; lambda (z:int->int). z    -------------------
 
 4: 0/1
 Expected 4 lines of output, got 0
-Failing file:                         *********************
+Failing file:                         ----------------------------------
 let zero = 0;
 
 

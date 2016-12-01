@@ -290,11 +290,12 @@ letP :: Parser LamExp
 letP = Let <$> (ws *> kw "let" *> ws *> var) <*> (ws *> (char '=') *> ws *> lexp) <*> (ws *> kw "in" *> ws *> lexp)
 
 letP2 :: Parser LamExp
-letP2 = let v = ws *> kw "let" *> ws *> var
-            t = ws *> char ':' *> ws *> typeP
-            e1 = ws *> (char '=') *> ws *> lexp
-            e2 = ws *> kw "in" *> ws *> lexp
-        in Let <$> v <*> (Assign <$> e1 <*> t) <*> e2
+-- letP2 = let v = ws *> kw "let" *> ws *> var
+--             t = ws *> char ':' *> ws *> typeP
+--             e1 = ws *> (char '=') *> ws *> lexp
+--             e2 = ws *> kw "in" *> ws *> lexp <* ws
+--         in  Let <$> v <*> (t *> e1) <*> e2
+letP2 = Let <$> (ws *> kw "let" *> ws *> var) <*> (ws *> char ':' *> ws *> typeP *> ws *> (char '=') *> ws *> lexp) <*> (ws *> kw "in" *> ws *> lexp <* ws)
 
 
 test4 = regularParse lexp "let rec toZero:int->int = lambda n:int. if n == 0 then 0 else toZero (n+1) in toZero 5"
@@ -305,9 +306,10 @@ letRecP :: Parser LamExp
 letRecP  = LetRec <$> (ws *> kw "let" *> ws *> kw "rec" *> var) <*> (ws *> char ':' *> typeP) <*>
                   (ws *> char '=' *> lexp) <*> (ws *> kw "in" *> lexp)
 lamP :: Parser LamExp
-lamP = try oneArg <|> try multArgs
+lamP = try oneArg <|> try oneArg2 <|> try multArgs
         where
           oneArg = Lam <$> (ws *> (kw "lambda") *> var) <*> (col *> typeP <* dot) <*> (try lexp <|> try (parens lexp))
+          oneArg2 = Lam <$> (ws *> (kw "lambda") *> ws *> char '(' *> ws *> var) <*> (col *> typeP <* char ')' <* ws <* dot) <*> (try lexp <|> try (parens lexp))
           multArgs = Lam <$> (ws *> ((kw "lambda") *> var)) <*> (col *> typeP) <*> lamP2
 
 lamP2 :: Parser LamExp
@@ -722,14 +724,19 @@ program = seqParser
 seqParser :: Parser Stmt
 seqParser = ws *> (try (Seq <$> (stmtParser) <*> seqParser) <|> try stmtParserEnd <|> try stmtParserEnd2) -- <|> try stmtParserEnd2)
 
+letCaseP :: Parser Stmt
+letCaseP = LetS <$> ((kw "let") *> var <* (char '=')) <*> lexp
+letCaseP2 :: Parser Stmt
+letCaseP2 = LetS <$> ((kw "let") *> var <* ws <* (char ':' ) <* ws <* typeP <* ws <* (char '=')) <*> lexp
+
 
 stmtParser :: Parser Stmt
 stmtParser = (try expCase2) <|> (try expCase) <|> (try letCase2) <|> (try letCase) <|> (try letRecCase) <|> (try letRecCase2)
          where
             expCase = Exp <$> lexp <* sc
             expCase2 = Exp <$> lexp <* ws <* char ':' <* ws <* typeP <* sc
-            letCase = LetS <$> ((kw "let") *> var <* (char '=')) <*> lexp <* sc
-            letCase2 = LetS <$> ((kw "let") *> var <* (char '=')) <*> lexp <* ws <* char ':' <* ws <* typeP <* sc
+            letCase = (try letCaseP <|> try letCaseP2) <* sc
+            letCase2 = (try letCaseP <|> try letCaseP2) <* ws <* char ':' <* ws <* typeP <* sc
             letRecCase = LetRS <$> ((kw "let") *> ws *> (kw "rec") *> ws *> var) <*> (ws *> (char ':') *> ws *> typeP) <*> (ws *> (char '=') *> ws *> lexp <* sc)
             letRecCase2 = LetRS <$> ((kw "let") *> ws *> (kw "rec") *> ws *> var) <*> (ws *> (char ':') *> ws *> typeP) <*> (ws *> (char '=') *> ws *> lexp <* ws <* char ':' <* ws <* typeP <* sc)
 
@@ -738,8 +745,8 @@ stmtParserEnd = (try expCase2) <|> (try expCase) <|> (try letCase2) <|> (try let
          where
             expCase = Exp <$> lexp <* eof
             expCase2 = Exp <$> lexp <* ws <* char ':' <* ws <* typeP <* eof
-            letCase = LetS <$> ((kw "let") *> var <* (char '=')) <*> lexp <* eof
-            letCase2 = LetS <$> ((kw "let") *> var <* (char '=')) <*> lexp <* ws <* char ':' <* ws <* typeP <* eof
+            letCase = (try letCaseP <|> try letCaseP2) <* eof
+            letCase2 = (try letCaseP <|> try letCaseP2) <* ws <* char ':' <* ws <* typeP <* eof
             letRecCase = LetRS <$> ((kw "let") *> ws *> (kw "rec") *> ws *> var) <*> (ws *> (char ':') *> ws *> typeP) <*> (ws *> (char '=') *> ws *> lexp <* eof)
             letRecCase2 = LetRS <$> ((kw "let") *> ws *> (kw "rec") *> ws *> var) <*> (ws *> (char ':') *> ws *> typeP) <*> (ws *> (char '=') *> ws *> lexp <* ws <* char ':' <* ws <* typeP <* eof)
 
@@ -749,8 +756,8 @@ stmtParserEnd2 = (try expCase2) <|> (try expCase) <|> (try letCase2) <|> (try le
          where
             expCase = Exp <$> lexp <* sc <* eof
             expCase2 = Exp <$> lexp <* ws <* char ':' <* ws <* typeP <* sc <* eof
-            letCase = LetS <$> ((kw "let") *> var <* (char '=')) <*> lexp <* sc <* eof
-            letCase2 = LetS <$> ((kw "let") *> var <* (char '=')) <*> lexp <* ws <* char ':' <* ws <* typeP  <* sc <* eof
+            letCase = (try letCaseP <|> try letCaseP2) <* sc <* eof
+            letCase2 = (try letCaseP <|> try letCaseP2) <* ws <* char ':' <* ws <* typeP  <* sc <* eof
             letRecCase = LetRS <$> ((kw "let") *> ws *> (kw "rec") *> ws *> var) <*> (ws *> (char ':') *> ws *> typeP) <*> (ws *> (char '=') *> ws *> lexp <* sc <* eof)
             letRecCase2 = LetRS <$> ((kw "let") *> ws *> (kw "rec") *> ws *> var) <*> (ws *> (char ':') *> ws *> typeP) <*> (ws *> (char '=') *> ws *> lexp <* ws <* char ':' <* ws <* typeP <* sc <* eof)
 
